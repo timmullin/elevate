@@ -243,5 +243,54 @@ foreach my $test_hr (@TEST_DATA) {
     }
 }
 
+my $mock_cpev = Test::MockModule->new('cpev');
+$mock_cpev->redefine(
+    _read_stage_file => sub {
+        return {};
+    }
+);
+
+my $cpev = cpev->new->_init( '--check', '--upgrade-to=OogaBoogaLinux' );
+
+like(
+    dies { $cpev->_parse_opt_upgrade_to() },
+    qr/Invalid --upgrade_to value/,
+    'Exception thrown for invalid linux distro'
+);
+
+$cpev = cpev->new->_init('--check');
+
+ok lives { $cpev->_parse_opt_upgrade_to() }, 'No exception when upgrade-to not supplied';
+is $cpev->upgrade_to(), 'AlmaLinux', 'Defaults to AlmaLinux when upgrade-to not specified';
+
+$cpev = cpev->new->_init( '--check', '--upgrade-to=almalinux' );
+
+ok lives { $cpev->_parse_opt_upgrade_to() }, 'No exception when upgrade-to set to AlmaLinux';
+is $cpev->upgrade_to(), 'AlmaLinux', 'Set to use AlmaLinux when upgrade-to set to AlmaLinux';
+
+$cpev = cpev->new->_init( '--check', '--upgrade-to=rocky' );
+
+ok lives { $cpev->_parse_opt_upgrade_to() }, 'No exception when upgrade-to set to Rocky';
+is $cpev->upgrade_to(), 'Rocky', 'Set to use Rocky when upgrade-to set to Rocky';
+
+my $user_has_been_prompted = 0;
+
+my $mock_io_prompt = Test::MockModule->new('IO::Prompt');
+$mock_io_prompt->redefine(
+    prompt => sub {
+        $user_has_been_prompted = 1;
+        return 1;
+    }
+);
+
+$cpev = cpev->new->_init('--start');
+$cpev->give_last_chance();
+is $user_has_been_prompted, 1, 'IP::Prompt invoked without the non-interactive option';
+
+$user_has_been_prompted = 0;
+$cpev                   = cpev->new->_init( '--start', '--non-interactive' );
+$cpev->give_last_chance();
+is $user_has_been_prompted, 0, 'IP::Prompt not invoked with the non-interactive option';
+
 done_testing();
 exit;
