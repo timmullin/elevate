@@ -68,6 +68,7 @@ our @BLOCKERS = qw{
   OVH
   Python
   AbsoluteSymlinks
+  Leapp
 };
 
 use constant ELEVATE_BLOCKER_FILE => '/var/cpanel/elevate-blockers';
@@ -88,7 +89,7 @@ sub check ($self) {    # do_check - main  entry point
     # If no argument passed to --check, use default path:
     my $blocker_file = $self->cpev->getopt('check') || ELEVATE_BLOCKER_FILE;
 
-    my $has_blockers = $self->_has_blockers(1);
+    my $has_blockers = $self->_has_blockers( $self->cpev->getopt('start') ? 0 : 1 );
 
     $self->save( $blocker_file, { 'blockers' => $self->{'blockers'} } );
 
@@ -121,7 +122,7 @@ sub _has_blockers ( $self, $check_mode = 0 ) {
     }
 
     $_CHECK_MODE = !!$check_mode;    # running with --check
-    $self->abort_on_first_blocker( !$_CHECK_MODE );
+    $self->abort_on_first_blocker(0);
 
     my $ok = eval { $self->_check_all_blockers; 1; };
 

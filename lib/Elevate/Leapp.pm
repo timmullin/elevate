@@ -38,7 +38,7 @@ sub _build_yum ($self) {
     return Elevate::YUM->new( cpev => $self->cpev() );
 }
 
-sub install ($self) {
+sub install ( $self, $remove_kernel_devel = 1 ) {
 
     unless ( Cpanel::Pkgr::is_installed('elevate-release') ) {
         my $elevate_rpm_url = Elevate::OS::elevate_rpm_url();
@@ -51,9 +51,18 @@ sub install ($self) {
         $self->yum->install( 'leapp-upgrade', $leapp_data_pkg );
     }
 
-    if ( Cpanel::Pkgr::is_installed('kernel-devel') ) {
+    if ( $remove_kernel_devel && Cpanel::Pkgr::is_installed('kernel-devel') ) {
         $self->yum->remove('kernel-devel');
     }
+}
+
+sub preupgrade ($self) {
+
+    INFO("Running leapp preupgrade checks");
+
+    $self->cpev->ssystem_hide_output( '/usr/bin/leapp', 'preupgrade' );
+
+    INFO("Finished running leapp preupgrade checks");
 
     return;
 }
@@ -85,6 +94,64 @@ sub upgrade ($self) {
 
     $self->_report_leapp_failure_and_die();
     return;
+}
+
+sub search_report_file_for_blockers ($self) {
+
+    my @blockers;
+    my @ignored_blockers = qw(
+      check_installed_devel_kernels
+      verify_check_results
+    );
+    my $leapp_json_report = LEAPP_REPORT_JSON;
+
+    if ( !-e $leapp_json_report ) {
+        ERROR("Leapp did not generated the expected report file: $leapp_json_report");
+        return [];
+    }
+
+    my $report = eval { Cpanel::JSON::LoadFile($leapp_json_report) } // {};
+    if ( my $exception = $@ ) {
+        ERROR("Unable to parse leapp report file ($leapp_json_report): $exception");
+        return [];
+    }
+
+    my $entries = $report->{entries};
+    return [] unless ( ref $entries eq 'ARRAY' );
+
+    foreach my $entry (@$entries) {
+        next unless ( ref $entry eq 'HASH' );
+
+        # If it is a blocker, then it will contain an array
+        # of flags one of which will be named "inhibitor"
+        my $flags = $entry->{flags};
+        next unless ( ref $flags eq 'ARRAY' );
+        next unless scalar grep { $_ eq 'inhibitor' } @$flags;
+
+        # Some blockers we ignore because we fix them before upgrade
+        next if scalar grep { $_ eq $entry->{actor} } @ignored_blockers;
+
+        my $blocker = {
+            title   => $entry->{title},
+            summary => $entry->{summary},
+        };
+
+        if ( ref $entry->{detail}{remediations} eq 'ARRAY' ) {
+            foreach my $rem ( @{ $entry->{detail}{remediations} } ) {
+                next unless ( $rem->{type} && $rem->{context} );
+                if ( $rem->{type} eq 'hint' ) {
+                    $blocker->{hint} = $rem->{context};
+                }
+                if ( $rem->{type} eq 'command' && ref $rem->{context} eq 'ARRAY' ) {
+                    $blocker->{command} = join ' ', @{ $rem->{context} };
+                }
+            }
+        }
+
+        push @blockers, $blocker;
+    }
+
+    return \@blockers;
 }
 
 sub _report_leapp_failure_and_die ($self) {

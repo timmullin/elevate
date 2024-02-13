@@ -140,6 +140,31 @@ $mock_leap_report_json->contents( <<'EOS' );
       ],
       "key": "d35f6c6b1b1fa6924ef442e3670d90fa92f0d54b",
       "id": "c6f620d225195d783a70a87d07403a758ac595ffecf8c7674f55b06e8b9d93ab"
+    },
+    {
+      "actor": "special_test_blocker",
+      "title": "Test Blocker",
+      "summary": "This should be picked up by the unit test",
+      "flags": [
+        "inhibitor"
+      ],
+      "detail": {
+        "remediations": [
+          {
+            "type": "hint",
+            "context": "This is the test blocker hint"
+          },
+          {
+            "type": "command",
+            "context": [
+              "unblock",
+              "me",
+              "right",
+              "now"
+            ]
+          }
+        ]
+      }
     }
   ]
 }
@@ -185,5 +210,18 @@ like(
     $report_check,
     'advertise leapp report txt'
 );
+
+my $expected_blockers = [
+    {
+        title   => "Test Blocker",
+        summary => "This should be picked up by the unit test",
+        hint    => "This is the test blocker hint",
+        command => "unblock me right now",
+    }
+];
+
+my $found_blockers = cpev->leapp->search_report_file_for_blockers();
+
+is $found_blockers, $expected_blockers, 'Properly parsed output JSON file for blockers';
 
 done_testing;

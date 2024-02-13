@@ -279,6 +279,7 @@ use Elevate::Blockers::Python           ();
 use Elevate::Blockers::Repositories     ();    # using a constant
 use Elevate::Blockers::SSH              ();
 use Elevate::Blockers::WHM              ();
+use Elevate::Blockers::Leapp            ();
 
 # - fatpack Components
 use Elevate::Components::Base             ();

@@ -31,6 +31,7 @@ BEGIN {    # Suppress load of all of these at earliest point.
     $INC{'Elevate/Blockers/Repositories.pm'}       = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Blockers/SSH.pm'}                = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Blockers/WHM.pm'}                = 'script/elevate-cpanel.PL.static';
+    $INC{'Elevate/Blockers/Leapp.pm'}              = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Components/Base.pm'}             = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Components/AbsoluteSymlinks.pm'} = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Components/cPanelPlugins.pm'}    = 'script/elevate-cpanel.PL.static';
@@ -252,6 +253,7 @@ BEGIN {    # Suppress load of all of these at earliest point.
       OVH
       Python
       AbsoluteSymlinks
+      Leapp
     };
 
     use constant ELEVATE_BLOCKER_FILE => '/var/cpanel/elevate-blockers';
@@ -271,7 +273,7 @@ BEGIN {    # Suppress load of all of these at earliest point.
 
         my $blocker_file = $self->cpev->getopt('check') || ELEVATE_BLOCKER_FILE;
 
-        my $has_blockers = $self->_has_blockers(1);
+        my $has_blockers = $self->_has_blockers( $self->cpev->getopt('start') ? 0 : 1 );
 
         $self->save( $blocker_file, { 'blockers' => $self->{'blockers'} } );
 
@@ -304,7 +306,7 @@ BEGIN {    # Suppress load of all of these at earliest point.
         }
 
         $_CHECK_MODE = !!$check_mode;    # running with --check
-        $self->abort_on_first_blocker( !$_CHECK_MODE );
+        $self->abort_on_first_blocker(0);
 
         my $ok = eval { $self->_check_all_blockers; 1; };
 
@@ -2171,6 +2173,55 @@ EOS
     1;
 
 }    # --- END lib/Elevate/Blockers/WHM.pm
+
+{    # --- BEGIN lib/Elevate/Blockers/Leapp.pm
+
+    package Elevate::Blockers::Leapp;
+
+    use cPstrict;
+
+    use Elevate::Constants ();
+
+    # use Elevate::Blockers::Base();
+    our @ISA;
+    BEGIN { push @ISA, qw(Elevate::Blockers::Base); }
+
+    use Cwd ();
+
+    # use Log::Log4perl qw(:easy);
+    INIT { Log::Log4perl->import(qw{:easy}); }
+
+    sub check ($self) {
+
+        return if $self->is_check_mode();    # skip for --check
+
+        return unless $self->should_run_leapp;    # skip when --no-leapp is provided
+
+        $self->cpev->leapp->install(0);
+
+        $self->cpev->leapp->preupgrade();
+
+        my $blockers = $self->cpev->leapp->search_report_file_for_blockers();
+
+        foreach my $blocker (@$blockers) {
+            my $message = $blocker->{title} . "\n";
+            $message .= $blocker->{summary} . "\n";
+            if ( $blocker->{hint} ) {
+                $message .= "Possible resolution: " . $blocker->{hint} . "\n";
+            }
+            if ( $blocker->{command} ) {
+                $message .= "Consider running:" . "\n" . $blocker->{command} . "\n";
+            }
+
+            $self->has_blocker($message);
+        }
+
+        return;
+    }
+
+    1;
+
+}    # --- END lib/Elevate/Blockers/Leapp.pm
 
 {    # --- BEGIN lib/Elevate/Components/Base.pm
 
@@ -4663,7 +4714,7 @@ EOS
         return Elevate::YUM->new( cpev => $self->cpev() );
     }
 
-    sub install ($self) {
+    sub install ( $self, $remove_kernel_devel = 1 ) {
 
         unless ( Cpanel::Pkgr::is_installed('elevate-release') ) {
             my $elevate_rpm_url = Elevate::OS::elevate_rpm_url();
@@ -4676,9 +4727,18 @@ EOS
             $self->yum->install( 'leapp-upgrade', $leapp_data_pkg );
         }
 
-        if ( Cpanel::Pkgr::is_installed('kernel-devel') ) {
+        if ( $remove_kernel_devel && Cpanel::Pkgr::is_installed('kernel-devel') ) {
             $self->yum->remove('kernel-devel');
         }
+    }
+
+    sub preupgrade ($self) {
+
+        INFO("Running leapp preupgrade checks");
+
+        $self->cpev->ssystem_hide_output( '/usr/bin/leapp', 'preupgrade' );
+
+        INFO("Finished running leapp preupgrade checks");
 
         return;
     }
@@ -4710,6 +4770,61 @@ EOS
 
         $self->_report_leapp_failure_and_die();
         return;
+    }
+
+    sub search_report_file_for_blockers ($self) {
+
+        my @blockers;
+        my @ignored_blockers = qw(
+          check_installed_devel_kernels
+          verify_check_results
+        );
+        my $leapp_json_report = LEAPP_REPORT_JSON;
+
+        if ( !-e $leapp_json_report ) {
+            ERROR("Leapp did not generated the expected report file: $leapp_json_report");
+            return [];
+        }
+
+        my $report = eval { Cpanel::JSON::LoadFile($leapp_json_report) } // {};
+        if ( my $exception = $@ ) {
+            ERROR("Unable to parse leapp report file ($leapp_json_report): $exception");
+            return [];
+        }
+
+        my $entries = $report->{entries};
+        return [] unless ( ref $entries eq 'ARRAY' );
+
+        foreach my $entry (@$entries) {
+            next unless ( ref $entry eq 'HASH' );
+
+            my $flags = $entry->{flags};
+            next unless ( ref $flags eq 'ARRAY' );
+            next unless scalar grep { $_ eq 'inhibitor' } @$flags;
+
+            next if scalar grep { $_ eq $entry->{actor} } @ignored_blockers;
+
+            my $blocker = {
+                title   => $entry->{title},
+                summary => $entry->{summary},
+            };
+
+            if ( ref $entry->{detail}{remediations} eq 'ARRAY' ) {
+                foreach my $rem ( @{ $entry->{detail}{remediations} } ) {
+                    next unless ( $rem->{type} && $rem->{context} );
+                    if ( $rem->{type} eq 'hint' ) {
+                        $blocker->{hint} = $rem->{context};
+                    }
+                    if ( $rem->{type} eq 'command' && ref $rem->{context} eq 'ARRAY' ) {
+                        $blocker->{command} = join ' ', @{ $rem->{context} };
+                    }
+                }
+            }
+
+            push @blockers, $blocker;
+        }
+
+        return \@blockers;
     }
 
     sub _report_leapp_failure_and_die ($self) {
@@ -5064,6 +5179,18 @@ EOS
         return _ssystem( \@args, %opts );
     }
 
+    sub ssystem_hide_output ( $, @args ) {
+
+        my %opts;
+        if ( ref $args[0] ) {
+            my $ropts = shift @args;
+            %opts = %$ropts;
+        }
+        $opts{should_hide_output} = 1;
+
+        return _ssystem( \@args, %opts );
+    }
+
     sub ssystem ( $, @args ) {
 
         my %opts;
@@ -5096,7 +5223,7 @@ EOS
             Cpanel::IOCallbackWriteLine->new(
                 sub ($line) {
                     chomp $line;
-                    INFO($line);
+                    INFO($line) unless $opts{should_hide_output};
                     if ( $opts{should_capture_output} ) {
                         push $capture_output->{$label}->@*, $line;
                     }
@@ -6027,6 +6154,7 @@ use Elevate::Blockers::Python           ();
 use Elevate::Blockers::Repositories     ();    # using a constant
 use Elevate::Blockers::SSH              ();
 use Elevate::Blockers::WHM              ();
+use Elevate::Blockers::Leapp            ();
 
 # - fatpack Components
 use Elevate::Components::Base             ();
