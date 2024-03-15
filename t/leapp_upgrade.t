@@ -220,7 +220,7 @@ my $expected_blockers = [
     }
 ];
 
-my $found_blockers = cpev->leapp->search_report_file_for_blockers(
+my $found_blockers = cpev->leapp->search_report_file_for_inhibitors(
     qw(
       check_installed_devel_kernels
       verify_check_results
@@ -241,7 +241,7 @@ $expected_blockers = [
 # This keeps Cpanel::Exception from throwing errors by accessing ummocked locale files
 local $Cpanel::Exception::LOCALIZE_STRINGS = 0;
 
-$found_blockers = cpev->leapp->search_report_file_for_blockers();
+$found_blockers = cpev->leapp->search_report_file_for_inhibitors();
 
 is $found_blockers, $expected_blockers, 'Returned blocker for invalid JSON in report file';
 

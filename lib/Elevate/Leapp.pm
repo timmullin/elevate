@@ -67,11 +67,11 @@ sub preupgrade ($self) {
 
     INFO("Running leapp preupgrade checks");
 
-    $self->cpev->ssystem_hide_output( '/usr/bin/leapp', 'preupgrade' );
+    my $out = $self->cpev->ssystem_hide_and_capture_output( '/usr/bin/leapp', 'preupgrade' );
 
     INFO("Finished running leapp preupgrade checks");
 
-    return;
+    return $out;
 }
 
 sub upgrade ($self) {
@@ -103,7 +103,7 @@ sub upgrade ($self) {
     return;
 }
 
-sub search_report_file_for_blockers ( $self, @ignored_blockers ) {
+sub search_report_file_for_inhibitors ( $self, @ignored_blockers ) {
 
     my @blockers;
     my $leapp_json_report = LEAPP_REPORT_JSON;
