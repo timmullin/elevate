@@ -245,4 +245,65 @@ $found_blockers = cpev->leapp->search_report_file_for_inhibitors();
 
 is $found_blockers, $expected_blockers, 'Returned blocker for invalid JSON in report file';
 
+my $test_stdout = <<'EOS';
+====> * used_repository_scanner
+        Scan used enabled repositories
+====> * scan_rollout_repositories
+        Scan for repository files associated with the Gradual Rollout System.
+====> * repositories_blacklist
+        Exclude target repositories provided by Red Hat without support.
+====> * pes_events_scanner
+        Provides data about package events from Package Evolution Service.
+====> * setuptargetrepos
+        Produces list of repositories that should be available to be used by Upgrade process.
+
+============================================================
+                      RANDOM BOGUS BANNER
+============================================================
+
+============================================================
+                           ERRORS
+============================================================
+
+2024-02-23 19:42:32.285162 [ERROR] Actor: system_facts
+Message: Failed parsing of /etc/default/grub
+Summary:
+    Problematic line: unset GRUB_TERMINAL_OUTPUT
+    Error: need more than 1 value to unpack
+
+============================================================
+                       END OF ERRORS
+============================================================
+
+
+Debug output written to /var/log/leapp/leapp-preupgrade.log
+
+============================================================
+                           REPORT
+============================================================
+
+A report has been generated at /var/log/leapp/leapp-report.json
+A report has been generated at /var/log/leapp/leapp-report.txt
+
+============================================================
+                       END OF REPORT
+============================================================
+EOS
+
+my $expected_error_block = <<'EOS';
+
+2024-02-23 19:42:32.285162 [ERROR] Actor: system_facts
+Message: Failed parsing of /etc/default/grub
+Summary:
+    Problematic line: unset GRUB_TERMINAL_OUTPUT
+    Error: need more than 1 value to unpack
+
+EOS
+
+my @test_stdout_lines = split( "\n", $test_stdout );
+
+my $found_error_block = cpev->leapp->extract_error_block_from_output( \@test_stdout_lines );
+
+is $found_error_block, $expected_error_block, 'Properly extracted the error block from leapp stdout';
+
 done_testing;
