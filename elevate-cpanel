@@ -2198,51 +2198,13 @@ EOS
             $self->has_blocker($message);
         }
 
-        my $error_block = _extract_error_block_from_output( $out->{stdout} );
+        my $error_block = $self->cpev->leapp->extract_error_block_from_output( $out->{stdout} );
 
         if ( length $error_block ) {
             $self->has_blocker( "Leapp encountered the following error(s):\n" . $error_block );
         }
 
         return;
-    }
-
-    sub _extract_error_block_from_output ($text_ar) {
-
-        my $error_block = '';
-
-        my $found_banner_line        = 0;
-        my $found_second_banner_line = 0;
-        my $in_error_block           = 0;
-
-        foreach my $line (@$text_ar) {
-
-            if ( !$found_banner_line ) {
-                $found_banner_line = 1 if $line =~ /^={10}/;
-                next;
-            }
-
-            if ( !$in_error_block ) {
-                if ( $line =~ /^\s+ERRORS/ ) {
-                    $in_error_block = 1;
-                }
-                else {
-                    $found_banner_line = 0;
-                }
-                next;
-            }
-
-            if ( !$found_second_banner_line ) {
-                $found_second_banner_line = 1 if $line =~ /^={10}/;
-                next;
-            }
-
-            last if $line =~ /^={10}/;
-
-            $error_block .= $line;
-        }
-
-        return $error_block;
     }
 
     1;
@@ -4895,6 +4857,44 @@ EOS
         }
 
         return \@blockers;
+    }
+
+    sub extract_error_block_from_output ( $self, $text_ar ) {
+
+        my $error_block = '';
+
+        my $found_banner_line        = 0;
+        my $found_second_banner_line = 0;
+        my $in_error_block           = 0;
+
+        foreach my $line (@$text_ar) {
+
+            if ( !$found_banner_line ) {
+                $found_banner_line = 1 if $line =~ /^={10}/;
+                next;
+            }
+
+            if ( !$in_error_block ) {
+                if ( $line =~ /^\s+ERRORS/ ) {
+                    $in_error_block = 1;
+                }
+                else {
+                    $found_banner_line = 0;
+                }
+                next;
+            }
+
+            if ( !$found_second_banner_line ) {
+                $found_second_banner_line = 1 if $line =~ /^={10}/;
+                next;
+            }
+
+            last if $line =~ /^={10}/;
+
+            $error_block .= $line . "\n";
+        }
+
+        return $error_block;
     }
 
     sub _report_leapp_failure_and_die ($self) {
