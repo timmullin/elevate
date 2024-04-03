@@ -12,6 +12,8 @@ Simplified version of Cpanel::HelpfulScript for elevate
 
 use cPstrict;
 
+use Elevate::Database ();
+
 use Getopt::Long ();
 
 sub _OPTIONS {
@@ -24,6 +26,7 @@ sub _OPTIONS {
       no-leapp
       non-interactive
       leappbeta
+      mysql=s
     );
 }
 
@@ -33,7 +36,7 @@ sub _validate_option_combos ($self) {
       clean continue help log service status update version
     );
     my @start_only_options = qw(
-      manual-reboots non-interactive leappbeta
+      manual-reboots non-interactive leappbeta mysql
     );
 
     # Invoking with no options is permissible
@@ -69,6 +72,17 @@ sub _validate_option_combos ($self) {
     return 1;
 }
 
+sub _validate_mysql_param ($self) {
+
+    return 1 if !defined $self->getopt('mysql');
+
+    my ( $rc, $msg ) = Elevate::Database::validate_mysql_upgrade_version( $self->getopt('mysql') );
+
+    return 1 if $rc;
+
+    return $self->help( $msg, 1 );
+}
+
 sub init ( $self, @args ) {
 
     $self->{_getopt} = {};
@@ -80,6 +94,8 @@ sub init ( $self, @args ) {
     ) or return $self->help( "Invalid Option", 1 );
 
     return unless $self->_validate_option_combos();
+
+    return unless $self->_validate_mysql_param();
 
     return $self->full_help() if $self->getopt('help');
 }

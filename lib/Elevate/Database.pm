@@ -15,7 +15,8 @@ use cPstrict;
 use Elevate::OS        ();
 use Elevate::StageFile ();
 
-use Cpanel::Pkgr ();
+use Cpanel::MysqlUtils::Versions ();
+use Cpanel::Pkgr                 ();
 
 use constant MYSQL_BIN => '/usr/sbin/mysqld';
 
@@ -73,6 +74,36 @@ sub get_db_info_if_provided_by_cloudlinux ( $use_cache = 1 ) {
     }
 
     return ( $db_type, $db_version );
+}
+
+sub get_database_type_name_from_version ($version) {
+    return Cpanel::MariaDB::version_is_mariadb($version) ? 'MariaDB' : 'MySQL';
+}
+
+sub validate_mysql_upgrade_version ($upgrade_version) {
+
+    require Whostmgr::Mysql::Upgrade;
+    my $current_version     = Whostmgr::Mysql::Upgrade::get_current_version();
+    my $current_dbtype_name = get_database_type_name_from_version($current_version);
+
+    if ( $upgrade_version eq $current_version ) {
+        return ( 0, "$current_dbtype_name is already at version $current_version" );
+    }
+
+    my @installable_versions = Cpanel::MysqlUtils::Versions::get_installable_versions_for_version($current_version);
+
+    # The installable versions will include the current version
+    @installable_versions = grep { $_ ne $current_version } @installable_versions;
+
+    if ( !grep { $_ eq $upgrade_version } @installable_versions ) {
+        my $msg = "You cannot upgrade your installation of $current_dbtype_name to version $upgrade_version.";
+        if ( scalar @installable_versions ) {
+            $msg .= ' You must choose one of the following: ' . join( ', ', @installable_versions ) . '.';
+        }
+        return ( 0, $msg );
+    }
+
+    return ( 1, '' );
 }
 
 1;
