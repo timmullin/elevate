@@ -41,7 +41,9 @@ sub upgrade_database_server ($self) {
 
     require Whostmgr::Mysql::Upgrade;
 
-    my $upgrade_version     = $self->getopt('mysql') // Elevate::Database::get_default_upgrade_version();
+    my $upgrade_version = Elevate::StageFile::read_stage_file( 'mysql-version', '' );
+    $upgrade_version ||= Elevate::Database::get_default_upgrade_version();
+
     my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
 
     INFO("Beginning upgrade to $upgrade_dbtype_name $upgrade_version");

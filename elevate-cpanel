@@ -687,9 +687,11 @@ BEGIN {    # Suppress load of all of these at earliest point.
 
         my $mysql_version = Elevate::Database::get_local_database_version();
 
-        Elevate::StageFile::update_stage_file( { 'mysql-version' => $mysql_version } );
+        if ( Elevate::Database::is_database_version_supported($mysql_version) ) {
 
-        return 0 if Elevate::Database::is_database_version_supported($mysql_version);
+            Elevate::StageFile::update_stage_file( { 'mysql-version' => $mysql_version } );
+            return 0;
+        }
 
         my $pretty_distro_name  = $self->upgrade_to_pretty_name();
         my $database_type_name  = Elevate::Database::get_database_type_name_from_version($mysql_version);
@@ -4578,7 +4580,9 @@ EOS
 
         require Whostmgr::Mysql::Upgrade;
 
-        my $upgrade_version     = $self->getopt('mysql') // Elevate::Database::get_default_upgrade_version();
+        my $upgrade_version = Elevate::StageFile::read_stage_file( 'mysql-version', '' );
+        $upgrade_version ||= Elevate::Database::get_default_upgrade_version();
+
         my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
 
         INFO("Beginning upgrade to $upgrade_dbtype_name $upgrade_version");

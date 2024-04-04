@@ -146,12 +146,14 @@ sub _blocker_old_cpanel_mysql ($self) {
 
     my $mysql_version = Elevate::Database::get_local_database_version();
 
-    # store the MySQL version we started from
-    Elevate::StageFile::update_stage_file( { 'mysql-version' => $mysql_version } );
-
     # If we are running a local version of MySQL/MariaDB that will be
     # supported by the new OS version, we leave it as it is.
-    return 0 if Elevate::Database::is_database_version_supported($mysql_version);
+    if ( Elevate::Database::is_database_version_supported($mysql_version) ) {
+
+        # store the MySQL version we started from
+        Elevate::StageFile::update_stage_file( { 'mysql-version' => $mysql_version } );
+        return 0;
+    }
 
     my $pretty_distro_name  = $self->upgrade_to_pretty_name();
     my $database_type_name  = Elevate::Database::get_database_type_name_from_version($mysql_version);
