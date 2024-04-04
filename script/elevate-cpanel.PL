@@ -1045,6 +1045,8 @@ sub run_stage_2 ($self) {
     $self->ssystem_and_die(qw{/scripts/update-packages});
     $self->ssystem_and_die(qw{/usr/bin/yum -y update});
 
+    $self->run_component_once( 'Database' => 'pre_leapp' );
+
     $self->disable_all_cpanel_services();
 
     $self->setup_outdated_services();
@@ -1057,7 +1059,6 @@ sub run_stage_2 ($self) {
     $self->run_component_once( 'AutoSSL'    => 'pre_leapp' );
     $self->run_component_once( 'KernelCare' => 'pre_leapp' );
     $self->run_component_once( 'Grub2'      => 'pre_leapp' );
-    $self->run_component_once( 'Database'   => 'pre_leapp' );
 
     return ACTION_REBOOT_NEEDED;
 }

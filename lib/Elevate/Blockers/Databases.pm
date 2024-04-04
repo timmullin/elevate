@@ -146,6 +146,9 @@ sub _blocker_old_cpanel_mysql ($self) {
 
     my $mysql_version = Elevate::Database::get_local_database_version();
 
+    # store the MySQL version we started from
+    Elevate::StageFile::update_stage_file( { 'mysql-version' => $mysql_version } );
+
     # If we are running a local version of MySQL/MariaDB that will be
     # supported by the new OS version, we leave it as it is.
     return 0 if Elevate::Database::is_database_version_supported($mysql_version);
@@ -156,7 +159,7 @@ sub _blocker_old_cpanel_mysql ($self) {
     my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
 
     WARN( <<~"EOS" );
-    You have $database_type_name $mysql_version server installed.
+    You have $database_type_name $mysql_version installed.
     This version is not available for $pretty_distro_name.
 
     EOS
@@ -178,6 +181,7 @@ sub _blocker_old_cpanel_mysql ($self) {
             /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=$upgrade_version
 
         Once the MySQL upgrade is finished, you can then retry to elevate to $pretty_distro_name.
+
         EOS
     }
     else {
@@ -187,6 +191,7 @@ sub _blocker_old_cpanel_mysql ($self) {
         to $upgrade_dbtype_name $upgrade_version.
         If you would prefer to upgrade $database_type_name to a different version,
         you can rerun this script with --mysql=<upgrade version>
+
         EOS
 
         if (
@@ -204,8 +209,8 @@ sub _blocker_old_cpanel_mysql ($self) {
         }
     }
 
-    # store the MySQL version we started from
-    Elevate::StageFile::update_stage_file( { 'mysql-version' => $mysql_version } );
+    # Change to the version we will uprade to
+    Elevate::StageFile::update_stage_file( { 'mysql-version' => $upgrade_version } );
 
     return 0;
 }
