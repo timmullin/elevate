@@ -56,6 +56,7 @@ BEGIN {    # Suppress load of all of these at earliest point.
     $INC{'Elevate/Components/WPToolkit.pm'}          = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Components/SSH.pm'}                = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Components/AutoSSL.pm'}            = 'script/elevate-cpanel.PL.static';
+    $INC{'Elevate/Components/Database.pm'}           = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/OS.pm'}                            = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/OS/CentOS7.pm'}                    = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/OS/CloudLinux7.pm'}                = 'script/elevate-cpanel.PL.static';
@@ -4538,6 +4539,67 @@ EOS
 
 }    # --- END lib/Elevate/Components/AutoSSL.pm
 
+{    # --- BEGIN lib/Elevate/Components/Database.pm
+
+    package Elevate::Components::Database;
+
+    use cPstrict;
+
+    use Elevate::Database ();
+
+    # use Elevate::Components::Base();
+    our @ISA;
+    BEGIN { push @ISA, qw(Elevate::Components::Base); }
+
+    # use Log::Log4perl qw(:easy);
+    INIT { Log::Log4perl->import(qw{:easy}); }
+
+    sub pre_leapp ($self) {
+
+        return if Elevate::Database::is_database_provided_by_cloudlinux();
+
+        return if Elevate::Database::is_database_version_supported( Elevate::Database::get_local_database_version() );
+
+        $self->upgrade_database_server();
+
+        return;
+    }
+
+    sub post_leapp ($self) {
+
+        return;
+    }
+
+    sub upgrade_database_server ($self) {
+
+        require Whostmgr::Mysql::Upgrade;
+
+        my $upgrade_version     = $self->getopt('mysql') // Elevate::Database::get_default_upgrade_version();
+        my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
+
+        INFO("Beginning upgrade to $upgrade_dbtype_name $upgrade_version");
+
+        my $failed_step = Whostmgr::Mysql::Upgrade::unattended_upgrade(
+            {
+                upgrade_type     => 'unattended_automatic',
+                selected_version => $upgrade_version,
+            }
+        );
+
+        if ($failed_step) {
+            FATAL("FAILED to upgrade to $upgrade_dbtype_name $upgrade_version");
+        }
+        else {
+            INFO("Finished upgrade to $upgrade_dbtype_name $upgrade_version");
+        }
+
+        return;
+    }
+
+    1;
+
+}    # --- END lib/Elevate/Components/Database.pm
+
 {    # --- BEGIN lib/Elevate/OS.pm
 
     package Elevate::OS;
@@ -6783,6 +6845,7 @@ use Elevate::Components::RmMod              ();
 use Elevate::Components::WPToolkit          ();
 use Elevate::Components::SSH                ();
 use Elevate::Components::AutoSSL            ();
+use Elevate::Components::Database           ();
 
 # - fatpack OS
 use Elevate::OS              ();
@@ -7535,6 +7598,7 @@ sub run_stage_2 ($self) {
     $self->run_component_once( 'AutoSSL'    => 'pre_leapp' );
     $self->run_component_once( 'KernelCare' => 'pre_leapp' );
     $self->run_component_once( 'Grub2'      => 'pre_leapp' );
+    $self->run_component_once( 'Database'   => 'pre_leapp' );
 
     return ACTION_REBOOT_NEEDED;
 }
