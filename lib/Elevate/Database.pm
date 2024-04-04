@@ -15,10 +15,21 @@ use cPstrict;
 use Elevate::OS        ();
 use Elevate::StageFile ();
 
+use Cpanel::MysqlUtils::Version  ();
 use Cpanel::MysqlUtils::Versions ();
 use Cpanel::Pkgr                 ();
 
+use Log::Log4perl qw(:easy);
+
 use constant MYSQL_BIN => '/usr/sbin/mysqld';
+
+use constant SUPPORTED_MYSQL_VERSIONS => qw{
+  8.0
+  10.3
+  10.4
+  10.5
+  10.6
+};
 
 sub is_database_provided_by_cloudlinux ( $use_cache = 1 ) {
 
@@ -76,14 +87,44 @@ sub get_db_info_if_provided_by_cloudlinux ( $use_cache = 1 ) {
     return ( $db_type, $db_version );
 }
 
+sub get_local_database_version () {
+
+    my $version;
+
+    eval {
+        local $Cpanel::MysqlUtils::Version::USE_LOCAL_MYSQL = 1;
+        $version = Cpanel::MysqlUtils::Version::uncached_mysqlversion();
+    };
+    if ( my $exception = $@ ) {
+        WARN("Error encountered querying the version from the database server: $exception");
+
+        # Load it from the configuration if we cannot get the version directly
+        my $cpconf = Cpanel::Config::LoadCpConf::loadcpconf();
+        $version = $cpconf->{'mysql-version'};
+    }
+
+    return $version;
+}
+
+sub is_database_version_supported ($version) {
+
+    return scalar grep { $version eq $_ } SUPPORTED_MYSQL_VERSIONS;
+}
+
+sub get_default_upgrade_version () {
+
+    require Whostmgr::Mysql::Upgrade;
+
+    return Whostmgr::Mysql::Upgrade::get_latest_available_version( version => get_local_database_version() );
+}
+
 sub get_database_type_name_from_version ($version) {
     return Cpanel::MariaDB::version_is_mariadb($version) ? 'MariaDB' : 'MySQL';
 }
 
 sub validate_mysql_upgrade_version ($upgrade_version) {
 
-    require Whostmgr::Mysql::Upgrade;
-    my $current_version     = Whostmgr::Mysql::Upgrade::get_current_version();
+    my $current_version     = get_local_database_version();
     my $current_dbtype_name = get_database_type_name_from_version($current_version);
 
     if ( $upgrade_version eq $current_version ) {

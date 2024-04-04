@@ -22,6 +22,7 @@ use Cpanel::JSON                       ();
 use Cpanel::SafeRun::Simple            ();
 use Cpanel::DB::Map::Collection::Index ();
 use Cpanel::Exception                  ();
+use Cpanel::MysqlUtils::MyCnf::Basic   ();
 
 use parent qw{Elevate::Blockers::Base};
 
@@ -141,63 +142,66 @@ sub _blocker_old_cloudlinux_mysql ($self) {
     EOS
 }
 
-sub _blocker_old_cpanel_mysql ( $self, $mysql_version = undef ) {
-    $mysql_version //= $self->cpconf->{'mysql-version'} // '';
+sub _blocker_old_cpanel_mysql ($self) {
 
-    my $pretty_distro_name = $self->upgrade_to_pretty_name();
+    my $mysql_version = Elevate::Database::get_local_database_version();
 
-    # checking MySQL version
-    if ( $mysql_version =~ qr{^\d+(\.\d)?$}a ) {
-        if ( 5 <= $mysql_version && $mysql_version <= 5.7 ) {
-            return $self->has_blocker( <<~"EOS");
-            You are using MySQL $mysql_version server.
-            This version is not available for $pretty_distro_name.
-            You first need to update your MySQL server to 8.0 or later.
+    # If we are running a local version of MySQL/MariaDB that will be
+    # supported by the new OS version, we leave it as it is.
+    return 0 if Elevate::Database::is_database_version_supported($mysql_version);
 
-            You can update to version 8.0 using the following command:
+    my $pretty_distro_name  = $self->upgrade_to_pretty_name();
+    my $database_type_name  = Elevate::Database::get_database_type_name_from_version($mysql_version);
+    my $upgrade_version     = $self->getopt('mysql') // Elevate::Database::get_default_upgrade_version();
+    my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
 
-                /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=8.0
+    WARN( <<~"EOS" );
+    You have $database_type_name $mysql_version server installed.
+    This version is not available for $pretty_distro_name.
 
-            Once the MySQL upgrade is finished, you can then retry to elevate to $pretty_distro_name.
-            EOS
-        }
-        elsif ( 10 <= $mysql_version && $mysql_version <= 10.2 ) {
+    EOS
 
-            # cPanel 110 no longer supports upgrades from something else to 10.3. Suggest 10.5 in that case:
-            my $upgrade_version = $Cpanel::Version::Tiny::major_version <= 108 ? '10.3' : '10.5';
-
-            return $self->has_blocker( <<~"EOS");
-            You are using MariaDB server $mysql_version, this version is not available for $pretty_distro_name.
-            You first need to update MariaDB server to $upgrade_version or later.
-
-            You can update to version $upgrade_version using the following command:
-
-                /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=$upgrade_version
-
-            Once the MariaDB upgrade is finished, you can then retry to elevate to $pretty_distro_name.
-            EOS
-        }
+    # If we are setup to use remote MySQL, then attempting an upgrade will fail
+    # TODO: Temporarily disable remote MySQL to allow the database upgrade
+    if ( Cpanel::MysqlUtils::MyCnf::Basic::is_remote_mysql() ) {
+        return $self->has_blocker( <<~"EOS" );
+        The system is currently setup to use a remote database server.
+        We cannot upgrade the local installation of $database_type_name $mysql_version
+        unless the system is configured to use the local database server.
+        EOS
     }
 
-    my %supported_mysql_versions = (
-        map { $_ => 1 }
-          qw{
-          8.0
-          10.3
-          10.4
-          10.5
-          10.6
-          }
-    );
+    if ( $self->is_check_mode() ) {
+        INFO( <<~"EOS" );
+        You can upgrade your installation of $database_type_name using the following command:
 
-    if ( !$supported_mysql_versions{$mysql_version} ) {
-        my $supported_version_str = join( ", ", sort { $a <=> $b } keys %supported_mysql_versions );
-        return $self->has_blocker( <<~"EOS");
-            We do not know how to upgrade to $pretty_distro_name with MySQL version $mysql_version.
-            Please upgrade your MySQL server to one of the supported versions before running elevate.
+            /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=$upgrade_version
 
-            Supported MySQL server versions are: $supported_version_str
+        Once the MySQL upgrade is finished, you can then retry to elevate to $pretty_distro_name.
+        EOS
+    }
+    else {
+        WARN( <<~"EOS" );
+        Prior to elevating this system to $pretty_distro_name,
+        we will automatically upgrade your installation of $database_type_name
+        to $upgrade_dbtype_name $upgrade_version.
+        If you would prefer to upgrade $database_type_name to a different version,
+        you can rerun this script with --mysql=<upgrade version>
+        EOS
+
+        if (
+            !IO::Prompt::prompt(
+                '-one_char',
+                '-yes_no',
+                '-tty',
+                -default => 'n',
+                "Do you consent to upgrading to $upgrade_dbtype_name $upgrade_version [y/N]: ",
+            )
+        ) {
+            return $self->has_blocker( <<~"EOS" );
+            The system cannot be elevated to $pretty_distro_name until $database_type_name has been upgraded.
             EOS
+        }
     }
 
     # store the MySQL version we started from
