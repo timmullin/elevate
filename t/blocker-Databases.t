@@ -46,99 +46,133 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
 {
     note 'cPanel MySQL behavior';
 
-    for my $os ( 'cent', 'cloud' ) {
-        set_os_to($os);
+    clear_messages_seen();
 
-        my $expected_target_os = $os eq 'cent' ? 'AlmaLinux 8' : 'CloudLinux 8';
+    my $test_db_version = '13';
+    my $is_db_supported = 1;
+    my $upgrade_version = '42';
+    my $stash           = undef;
+    my $is_check_mode   = 1;
+    my $cmd_upg_version = undef;
+    my $os_pretty_name  = 'ShinyOS';
+    my $is_remote_mysql = 0;
+    my $user_consent    = 0;
 
-        local $Cpanel::Version::Tiny::major_version = 110;
-        is(
-            $db->_blocker_old_cpanel_mysql('5.7'),
-            {
-                id  => q[Elevate::Blockers::Databases::_blocker_old_cpanel_mysql],
-                msg => <<~"EOS",
-    You are using MySQL 5.7 server.
-    This version is not available for $expected_target_os.
-    You first need to update your MySQL server to 8.0 or later.
-
-    You can update to version 8.0 using the following command:
-
-        /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=8.0
-
-    Once the MySQL upgrade is finished, you can then retry to elevate to $expected_target_os.
-    EOS
-            },
-            'MySQL 5.7 is a blocker.'
-        );
-
-        is(
-            $db->_blocker_old_cpanel_mysql('10.1'),
-            {
-                id  => q[Elevate::Blockers::Databases::_blocker_old_cpanel_mysql],
-                msg => <<~"EOS",
-        You are using MariaDB server 10.1, this version is not available for $expected_target_os.
-        You first need to update MariaDB server to 10.5 or later.
-
-        You can update to version 10.5 using the following command:
-
-            /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=10.5
-
-        Once the MariaDB upgrade is finished, you can then retry to elevate to $expected_target_os.
-        EOS
-            },
-            'Maria 10.1 is a blocker.'
-        );
-
-        is(
-            $db->_blocker_old_cpanel_mysql('10.2'),
-            {
-                id  => q[Elevate::Blockers::Databases::_blocker_old_cpanel_mysql],
-                msg => <<~"EOS",
-        You are using MariaDB server 10.2, this version is not available for $expected_target_os.
-        You first need to update MariaDB server to 10.5 or later.
-
-        You can update to version 10.5 using the following command:
-
-            /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=10.5
-
-        Once the MariaDB upgrade is finished, you can then retry to elevate to $expected_target_os.
-        EOS
-            },
-            'Maria 10.2 is a blocker.'
-        );
-
-        is(
-            $db->_blocker_old_cpanel_mysql('4.2'),
-            {
-                id  => q[Elevate::Blockers::Databases::_blocker_old_cpanel_mysql],
-                msg => <<~"EOS",
-        We do not know how to upgrade to $expected_target_os with MySQL version 4.2.
-        Please upgrade your MySQL server to one of the supported versions before running elevate.
-
-        Supported MySQL server versions are: 8.0, 10.3, 10.4, 10.5, 10.6
-        EOS
-            },
-            'MySQL 4.2 is a blocker.'
-        );
-    }
-
-    my $stash = undef;
+    my $mock_db = Test::MockModule->new('Elevate::Database');
+    $mock_db->redefine(
+        get_local_database_version          => sub { return $test_db_version; },
+        is_database_version_supported       => sub { return $is_db_supported; },
+        get_default_upgrade_version         => sub { return $upgrade_version; },
+        get_database_type_name_from_version => sub { return ( $_[0] eq $test_db_version ) ? 'OldDB' : 'NewDB' },
+    );
 
     my $mock_stagefile = Test::MockModule->new('Elevate::StageFile');
     $mock_stagefile->redefine(
         update_stage_file => sub { $stash = $_[0] },
     );
 
-    is( $db->_blocker_old_cpanel_mysql('8.0'), 0, "MySQL 8 and we're ok" );
-    is $stash, { 'mysql-version' => '8.0' }, " - Stash is updated";
-    is( $db->_blocker_old_cpanel_mysql('10.3'), 0, "Maria 10.3 and we're ok" );
-    is $stash, { 'mysql-version' => '10.3' }, " - Stash is updated";
-    is( $db->_blocker_old_cpanel_mysql('10.4'), 0, "Maria 10.4 and we're ok" );
-    is $stash, { 'mysql-version' => '10.4' }, " - Stash is updated";
-    is( $db->_blocker_old_cpanel_mysql('10.5'), 0, "Maria 10.5 and we're ok" );
-    is $stash, { 'mysql-version' => '10.5' }, " - Stash is updated";
-    is( $db->_blocker_old_cpanel_mysql('10.6'), 0, "Maria 10.6 and we're ok" );
-    is $stash, { 'mysql-version' => '10.6' }, " - Stash is updated";
+    my $mock_db_blocker = Test::MockModule->new('Elevate::Blockers::Databases');
+    $mock_db_blocker->redefine(
+        is_check_mode          => sub { return $is_check_mode; },
+        getopt                 => sub { return $cmd_upg_version; },
+        upgrade_to_pretty_name => sub { return $os_pretty_name; },
+    );
+
+    my $mock_basic = Test::MockModule->new('Cpanel::MysqlUtils::MyCnf::Basic');
+    $mock_basic->redefine(
+        is_remote_mysql => sub { return $is_remote_mysql; },
+    );
+
+    my $mock_io_prompt = Test::MockModule->new('IO::Prompt');
+    $mock_io_prompt->redefine(
+        prompt => sub { return $user_consent; },
+    );
+
+    # Test supported DB server (one that doesn't need an upgrade)
+    is( $db->_blocker_old_cpanel_mysql(), 0, "Supported database returns 0" );
+    no_messages_seen();
+    is( $stash, { 'mysql-version' => $test_db_version }, 'Stage file updated with original version' );
+
+    # The rest of the scenarios test where the DB server is NOT supported
+    $is_db_supported = 0;
+    $stash           = undef;
+
+    # Test blocker on remote mysql
+    $is_remote_mysql = 1;
+    is(
+        $db->_blocker_old_cpanel_mysql(),
+        {
+            id  => q[Elevate::Blockers::Databases::_blocker_old_cpanel_mysql],
+            msg => <<~"EOS",
+            The system is currently setup to use a remote database server.
+            We cannot upgrade the local installation of OldDB $test_db_version
+            unless the system is configured to use the local database server.
+            EOS
+        },
+        'Returns blocker if remote MySQL is enabled'
+    );
+    message_seen(
+        'WARN',
+        qr/You have OldDB $test_db_version installed.\nThis version is not available for $os_pretty_name/
+    );
+    message_seen( 'WARN', qr/remote database server/ );
+    is( $stash, undef, 'Stage file not updated due to blocker' );
+
+    # Test warning for check mode
+    $is_remote_mysql = 0;
+    $is_check_mode   = 1;
+    is( $db->_blocker_old_cpanel_mysql(), 0,     "Check mode returns 0" );
+    is( $stash,                           undef, 'Stage file not updated due to running a check' );
+    message_seen(
+        'WARN',
+        qr/You have OldDB $test_db_version installed.\nThis version is not available for $os_pretty_name/
+    );
+    message_seen( 'INFO', qr/whmapi1 start_background_mysql_upgrade version=$upgrade_version/ );
+
+    # Test for start mode, but the user declines
+    $is_check_mode = 0;
+    $user_consent  = 0;
+    is(
+        $db->_blocker_old_cpanel_mysql(),
+        {
+            id  => q[Elevate::Blockers::Databases::_blocker_old_cpanel_mysql],
+            msg => <<~"EOS",
+            The system cannot be elevated to $os_pretty_name until OldDB has been upgraded.
+            EOS
+        },
+        'Returns blocker if user declines the upgrade'
+    );
+    is( $stash, undef, 'Stage file not updated due to blocker' );
+    message_seen(
+        'WARN',
+        qr/You have OldDB $test_db_version installed.\nThis version is not available for $os_pretty_name/
+    );
+    message_seen(
+        'WARN',
+        qr/automatically upgrade .*to NewDB $upgrade_version/s
+    );
+    message_seen(
+        'WARN',
+        qr/The system cannot be elevated to $os_pretty_name until OldDB has been upgraded./
+    );
+
+    # Test for start mode, user accepts, & actively selected a different upgrade version (--mysql=)
+    $user_consent    = 1;
+    $cmd_upg_version = 99;
+    is(
+        $db->_blocker_old_cpanel_mysql(),
+        0,
+        "Returns 0 when user agrees to upgrade"
+    );
+    is( $stash, { 'mysql-version' => $cmd_upg_version }, 'Stage file updated with upgrade version' );
+    message_seen(
+        'WARN',
+        qr/You have OldDB $test_db_version installed.\nThis version is not available for $os_pretty_name/
+    );
+    message_seen(
+        'WARN',
+        qr/automatically upgrade .*to NewDB $cmd_upg_version/s
+    );
 }
 
 {

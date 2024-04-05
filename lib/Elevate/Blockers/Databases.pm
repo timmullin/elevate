@@ -185,30 +185,30 @@ sub _blocker_old_cpanel_mysql ($self) {
         Once the MySQL upgrade is finished, you can then retry to elevate to $pretty_distro_name.
 
         EOS
+        return 0;
     }
-    else {
-        WARN( <<~"EOS" );
-        Prior to elevating this system to $pretty_distro_name,
-        we will automatically upgrade your installation of $database_type_name
-        to $upgrade_dbtype_name $upgrade_version.
-        If you would prefer to upgrade $database_type_name to a different version,
-        you can rerun this script with --mysql=<upgrade version>
 
+    WARN( <<~"EOS" );
+    Prior to elevating this system to $pretty_distro_name,
+    we will automatically upgrade your installation of $database_type_name
+    to $upgrade_dbtype_name $upgrade_version.
+    If you would prefer to upgrade $database_type_name to a different version,
+    you can rerun this script with --mysql=<upgrade version>
+
+    EOS
+
+    if (
+        !IO::Prompt::prompt(
+            '-one_char',
+            '-yes_no',
+            '-tty',
+            -default => 'n',
+            "Do you consent to upgrading to $upgrade_dbtype_name $upgrade_version [y/N]: ",
+        )
+    ) {
+        return $self->has_blocker( <<~"EOS" );
+        The system cannot be elevated to $pretty_distro_name until $database_type_name has been upgraded.
         EOS
-
-        if (
-            !IO::Prompt::prompt(
-                '-one_char',
-                '-yes_no',
-                '-tty',
-                -default => 'n',
-                "Do you consent to upgrading to $upgrade_dbtype_name $upgrade_version [y/N]: ",
-            )
-        ) {
-            return $self->has_blocker( <<~"EOS" );
-            The system cannot be elevated to $pretty_distro_name until $database_type_name has been upgraded.
-            EOS
-        }
     }
 
     # Change to the version we will uprade to
