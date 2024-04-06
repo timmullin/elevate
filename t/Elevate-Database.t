@@ -6,6 +6,7 @@ use FindBin;
 
 use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/lib";
+use Test::Elevate;
 use Test::Elevate::OS;
 
 use Test2::Bundle::Extended;
@@ -156,6 +157,105 @@ $mock_stagefile->redefine(
             },
         ],
         'The expected things are stashed',
+    );
+}
+
+{
+    note 'Test get_local_database_version() behavior';
+
+    my $mysql_version        = 42;
+    my $mysql_version_config = 52;
+
+    my $mock_version = Test::MockModule->new('Cpanel::MysqlUtils::Version');
+    $mock_version->redefine(
+        uncached_mysqlversion => sub {
+            return $mysql_version if $mysql_version;
+            die "MYSQL_VERSION_FAIL";
+        },
+    );
+
+    my $mock_cpconf = Test::MockModule->new('Cpanel::Config::LoadCpConf');
+    $mock_cpconf->redefine(
+        loadcpconf => sub { return { 'mysql-version' => $mysql_version_config }; },
+    );
+
+    # Happy path test
+    is(
+        Elevate::Database::get_local_database_version(),
+        $mysql_version,
+        'Returns result of querying mysql version'
+    );
+    no_messages_seen();
+
+    # Test regular call failing & getting mysql version from the config
+    $mysql_version = 0;
+    is(
+        Elevate::Database::get_local_database_version(),
+        $mysql_version_config,
+        'Returns result of getting mysql version from the config'
+    );
+    message_seen( 'WARN', qr/MYSQL_VERSION_FAIL/ );
+}
+
+{
+    note 'Test is_database_version_supported() behavior';
+
+    my @should_pass = qw(8.0 10.3 10.4 10.5 10.6);
+    my @should_fail = qw(5.0 5.5 5.7 -2 83 3.1415);
+
+    foreach my $pass_version (@should_pass) {
+        ok( Elevate::Database::is_database_version_supported($pass_version), "$pass_version is supported" );
+    }
+
+    foreach my $fail_version (@should_fail) {
+        ok( !Elevate::Database::is_database_version_supported($fail_version), "$fail_version is NOT supported" );
+    }
+}
+
+{
+    note 'Test validate_mysql_upgrade_version() behavior';
+
+    my $current_version  = '10.5';
+    my $dbname           = 'OldDB';
+    my @upgrade_versions = qw(10.5 10.6 10.7);
+
+    my $mock_db = Test::MockModule->new('Elevate::Database');
+    $mock_db->redefine(
+        get_local_database_version          => sub { return $current_version; },
+        get_database_type_name_from_version => sub { return $dbname; },
+    );
+
+    my $mock_versions = Test::MockModule->new('Cpanel::MysqlUtils::Versions');
+    $mock_versions->redefine(
+        get_installable_versions_for_version => sub { return @upgrade_versions },
+    );
+
+    # The desired upgrade version is the same as the version already installed
+    my ( $rc, $msg ) = Elevate::Database::validate_mysql_upgrade_version($current_version);
+    is( $rc,  0,                                                'Fails when desired upgrade version is the same as the current version' );
+    is( $msg, "$dbname is already at version $current_version", 'Proper error message for upgrade version same as current version' );
+
+    # Asking to upgrade to a bogus version
+    ( $rc, $msg ) = Elevate::Database::validate_mysql_upgrade_version('42');
+    is( $rc, 0, 'Fails when desired upgrade version is bogus' );
+    is(
+        $msg,
+        "You cannot upgrade your installation of $dbname to version 42. You must choose one of the following: 10.6, 10.7.",
+        'Proper error message for bogus upgrade version'
+    );
+
+    # Valid upgrade request
+    ( $rc, $msg ) = Elevate::Database::validate_mysql_upgrade_version('10.6');
+    ok( $rc, 'Passes when valid upgrade version is requested' );
+
+    # Asking to upgrade to a bogus version when no good upgrade options exist
+    @upgrade_versions = qw(10.5);
+    ( $rc, $msg ) = Elevate::Database::validate_mysql_upgrade_version('42');
+    is( $rc, 0, 'Fails when desired upgrade version is bogus' );
+    is(
+        $msg,
+        "You cannot upgrade your installation of $dbname to version 42.",
+        'Proper error message for bogus upgrade version'
     );
 }
 
