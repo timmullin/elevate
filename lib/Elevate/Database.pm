@@ -122,29 +122,4 @@ sub get_database_type_name_from_version ($version) {
     return Cpanel::MariaDB::version_is_mariadb($version) ? 'MariaDB' : 'MySQL';
 }
 
-sub validate_mysql_upgrade_version ($upgrade_version) {
-
-    my $current_version     = get_local_database_version();
-    my $current_dbtype_name = get_database_type_name_from_version($current_version);
-
-    if ( $upgrade_version eq $current_version ) {
-        return ( 0, "$current_dbtype_name is already at version $current_version" );
-    }
-
-    my @installable_versions = Cpanel::MysqlUtils::Versions::get_installable_versions_for_version($current_version);
-
-    # The installable versions will include the current version
-    @installable_versions = grep { $_ ne $current_version } @installable_versions;
-
-    if ( !grep { $_ eq $upgrade_version } @installable_versions ) {
-        my $msg = "You cannot upgrade your installation of $current_dbtype_name to version $upgrade_version.";
-        if ( scalar @installable_versions ) {
-            $msg .= ' You must choose one of the following: ' . join( ', ', @installable_versions ) . '.';
-        }
-        return ( 0, $msg );
-    }
-
-    return ( 1, '' );
-}
-
 1;

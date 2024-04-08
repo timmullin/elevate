@@ -695,7 +695,7 @@ BEGIN {    # Suppress load of all of these at earliest point.
 
         my $pretty_distro_name  = $self->upgrade_to_pretty_name();
         my $database_type_name  = Elevate::Database::get_database_type_name_from_version($mysql_version);
-        my $upgrade_version     = $self->getopt('mysql') // Elevate::Database::get_default_upgrade_version();
+        my $upgrade_version     = Elevate::Database::get_default_upgrade_version();
         my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
 
         WARN( <<~"EOS" );
@@ -728,8 +728,6 @@ BEGIN {    # Suppress load of all of these at earliest point.
     Prior to elevating this system to $pretty_distro_name,
     we will automatically upgrade your installation of $database_type_name
     to $upgrade_dbtype_name $upgrade_version.
-    If you would prefer to upgrade $database_type_name to a different version,
-    you can rerun this script with --mysql=<upgrade version>
 
     EOS
 
@@ -5013,30 +5011,6 @@ EOS
         return Cpanel::MariaDB::version_is_mariadb($version) ? 'MariaDB' : 'MySQL';
     }
 
-    sub validate_mysql_upgrade_version ($upgrade_version) {
-
-        my $current_version     = get_local_database_version();
-        my $current_dbtype_name = get_database_type_name_from_version($current_version);
-
-        if ( $upgrade_version eq $current_version ) {
-            return ( 0, "$current_dbtype_name is already at version $current_version" );
-        }
-
-        my @installable_versions = Cpanel::MysqlUtils::Versions::get_installable_versions_for_version($current_version);
-
-        @installable_versions = grep { $_ ne $current_version } @installable_versions;
-
-        if ( !grep { $_ eq $upgrade_version } @installable_versions ) {
-            my $msg = "You cannot upgrade your installation of $current_dbtype_name to version $upgrade_version.";
-            if ( scalar @installable_versions ) {
-                $msg .= ' You must choose one of the following: ' . join( ', ', @installable_versions ) . '.';
-            }
-            return ( 0, $msg );
-        }
-
-        return ( 1, '' );
-    }
-
     1;
 
 }    # --- END lib/Elevate/Database.pm
@@ -6306,8 +6280,6 @@ EOS
 
     use cPstrict;
 
-    use Elevate::Database ();
-
     use Getopt::Long ();
 
     sub _OPTIONS {
@@ -6320,7 +6292,6 @@ EOS
           no-leapp
           non-interactive
           leappbeta
-          mysql=s
         );
     }
 
@@ -6330,7 +6301,7 @@ EOS
           clean continue help log service status update version
         );
         my @start_only_options = qw(
-          manual-reboots non-interactive leappbeta mysql
+          manual-reboots non-interactive leappbeta
         );
 
         return 1 if !%{ $self->{_getopt} };
@@ -6365,17 +6336,6 @@ EOS
         return 1;
     }
 
-    sub _validate_mysql_param ($self) {
-
-        return 1 if !defined $self->getopt('mysql');
-
-        my ( $rc, $msg ) = Elevate::Database::validate_mysql_upgrade_version( $self->getopt('mysql') );
-
-        return 1 if $rc;
-
-        return $self->help( $msg, 1 );
-    }
-
     sub init ( $self, @args ) {
 
         $self->{_getopt} = {};
@@ -6387,8 +6347,6 @@ EOS
         ) or return $self->help( "Invalid Option", 1 );
 
         return unless $self->_validate_option_combos();
-
-        return unless $self->_validate_mysql_param();
 
         return $self->full_help() if $self->getopt('help');
     }

@@ -53,7 +53,6 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
     my $upgrade_version = '42';
     my $stash           = undef;
     my $is_check_mode   = 1;
-    my $cmd_upg_version = undef;
     my $os_pretty_name  = 'ShinyOS';
     my $is_remote_mysql = 0;
     my $user_consent    = 0;
@@ -74,7 +73,6 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
     my $mock_db_blocker = Test::MockModule->new('Elevate::Blockers::Databases');
     $mock_db_blocker->redefine(
         is_check_mode          => sub { return $is_check_mode; },
-        getopt                 => sub { return $cmd_upg_version; },
         upgrade_to_pretty_name => sub { return $os_pretty_name; },
     );
 
@@ -156,22 +154,21 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
         qr/The system cannot be elevated to $os_pretty_name until OldDB has been upgraded./
     );
 
-    # Test for start mode, user accepts, & actively selected a different upgrade version (--mysql=)
-    $user_consent    = 1;
-    $cmd_upg_version = 99;
+    # Test for start mode where the user accepts
+    $user_consent = 1;
     is(
         $db->_blocker_old_cpanel_mysql(),
         0,
         "Returns 0 when user agrees to upgrade"
     );
-    is( $stash, { 'mysql-version' => $cmd_upg_version }, 'Stage file updated with upgrade version' );
+    is( $stash, { 'mysql-version' => $upgrade_version }, 'Stage file updated with upgrade version' );
     message_seen(
         'WARN',
         qr/You have OldDB $test_db_version installed.\nThis version is not available for $os_pretty_name/
     );
     message_seen(
         'WARN',
-        qr/automatically upgrade .*to NewDB $cmd_upg_version/s
+        qr/automatically upgrade .*to NewDB $upgrade_version/s
     );
 }
 

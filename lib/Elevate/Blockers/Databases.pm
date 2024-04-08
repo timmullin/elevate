@@ -157,7 +157,7 @@ sub _blocker_old_cpanel_mysql ($self) {
 
     my $pretty_distro_name  = $self->upgrade_to_pretty_name();
     my $database_type_name  = Elevate::Database::get_database_type_name_from_version($mysql_version);
-    my $upgrade_version     = $self->getopt('mysql') // Elevate::Database::get_default_upgrade_version();
+    my $upgrade_version     = Elevate::Database::get_default_upgrade_version();
     my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
 
     WARN( <<~"EOS" );
@@ -192,8 +192,6 @@ sub _blocker_old_cpanel_mysql ($self) {
     Prior to elevating this system to $pretty_distro_name,
     we will automatically upgrade your installation of $database_type_name
     to $upgrade_dbtype_name $upgrade_version.
-    If you would prefer to upgrade $database_type_name to a different version,
-    you can rerun this script with --mysql=<upgrade version>
 
     EOS
 
