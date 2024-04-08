@@ -178,7 +178,7 @@ sub _blocker_old_cpanel_mysql ($self) {
 
     if ( $self->is_check_mode() ) {
         INFO( <<~"EOS" );
-        You can upgrade your installation of $database_type_name using the following command:
+        You can manually upgrade your installation of $database_type_name using the following command:
 
             /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=$upgrade_version
 
@@ -195,18 +195,25 @@ sub _blocker_old_cpanel_mysql ($self) {
 
     EOS
 
-    if (
-        !IO::Prompt::prompt(
-            '-one_char',
-            '-yes_no',
-            '-tty',
-            -default => 'n',
-            "Do you consent to upgrading to $upgrade_dbtype_name $upgrade_version [y/N]: ",
-        )
-    ) {
-        return $self->has_blocker( <<~"EOS" );
-        The system cannot be elevated to $pretty_distro_name until $database_type_name has been upgraded.
-        EOS
+    if ( !$self->getopt('non-interactive') ) {
+        if (
+            !IO::Prompt::prompt(
+                '-one_char',
+                '-yes_no',
+                '-tty',
+                -default => 'y',
+                "Do you consent to upgrading to $upgrade_dbtype_name $upgrade_version [Y/n]: ",
+            )
+        ) {
+            return $self->has_blocker( <<~"EOS" );
+            The system cannot be elevated to $pretty_distro_name until $database_type_name has been upgraded. To upgrade manually:
+
+            /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=$upgrade_version
+
+            To have have this script perform the upgrade, run this script again and consent to allow it to upgrade $upgrade_dbtype_name $upgrade_version.
+
+            EOS
+        }
     }
 
     # Change to the version we will uprade to

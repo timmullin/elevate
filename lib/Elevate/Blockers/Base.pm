@@ -58,10 +58,6 @@ BEGIN {
     }
 }
 
-sub _build_cpconf ($self) {
-    return Cpanel::Config::LoadCpConf::loadcpconf() // {};
-}
-
 =head2 $self->is_check_mode( @args )
 
 Check if the script is called using '--check'

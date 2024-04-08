@@ -130,13 +130,11 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
     # Test for start mode, but the user declines
     $is_check_mode = 0;
     $user_consent  = 0;
-    is(
+    like(
         $db->_blocker_old_cpanel_mysql(),
         {
             id  => q[Elevate::Blockers::Databases::_blocker_old_cpanel_mysql],
-            msg => <<~"EOS",
-            The system cannot be elevated to $os_pretty_name until OldDB has been upgraded.
-            EOS
+            msg => qr/The system cannot be elevated to $os_pretty_name until OldDB has been upgraded./
         },
         'Returns blocker if user declines the upgrade'
     );

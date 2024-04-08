@@ -304,7 +304,7 @@ use Elevate::Components::RmMod              ();
 use Elevate::Components::WPToolkit          ();
 use Elevate::Components::SSH                ();
 use Elevate::Components::AutoSSL            ();
-use Elevate::Components::Database           ();
+use Elevate::Components::DatabaseUpgrade    ();
 
 # - fatpack OS
 use Elevate::OS              ();
@@ -1045,7 +1045,7 @@ sub run_stage_2 ($self) {
     $self->ssystem_and_die(qw{/scripts/update-packages});
     $self->ssystem_and_die(qw{/usr/bin/yum -y update});
 
-    $self->run_component_once( 'Database' => 'pre_leapp' );
+    $self->run_component_once( 'DatabaseUpgrade' => 'pre_leapp' );
 
     $self->disable_all_cpanel_services();
 

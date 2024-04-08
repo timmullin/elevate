@@ -100,7 +100,7 @@ sub get_local_database_version () {
 
         # Load it from the configuration if we cannot get the version directly
         my $cpconf = Cpanel::Config::LoadCpConf::loadcpconf();
-        $version = $cpconf->{'mysql-version'};
+        $version = $cpconf->{'mysql-version'} // '';
     }
 
     return $version;
@@ -120,6 +120,34 @@ sub get_default_upgrade_version () {
 
 sub get_database_type_name_from_version ($version) {
     return Cpanel::MariaDB::version_is_mariadb($version) ? 'MariaDB' : 'MySQL';
+}
+
+sub upgrade_database_server () {
+
+    require Whostmgr::Mysql::Upgrade;
+
+    my $upgrade_version = Elevate::StageFile::read_stage_file( 'mysql-version', '' );
+    $upgrade_version ||= Elevate::Database::get_default_upgrade_version();
+
+    my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
+
+    INFO("Beginning upgrade to $upgrade_dbtype_name $upgrade_version");
+
+    my $failed_step = Whostmgr::Mysql::Upgrade::unattended_upgrade(
+        {
+            upgrade_type     => 'unattended_automatic',
+            selected_version => $upgrade_version,
+        }
+    );
+
+    if ($failed_step) {
+        FATAL("FAILED to upgrade to $upgrade_dbtype_name $upgrade_version");
+    }
+    else {
+        INFO("Finished upgrade to $upgrade_dbtype_name $upgrade_version");
+    }
+
+    return;
 }
 
 1;

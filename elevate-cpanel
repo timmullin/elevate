@@ -56,7 +56,7 @@ BEGIN {    # Suppress load of all of these at earliest point.
     $INC{'Elevate/Components/WPToolkit.pm'}          = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Components/SSH.pm'}                = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/Components/AutoSSL.pm'}            = 'script/elevate-cpanel.PL.static';
-    $INC{'Elevate/Components/Database.pm'}           = 'script/elevate-cpanel.PL.static';
+    $INC{'Elevate/Components/DatabaseUpgrade.pm'}    = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/OS.pm'}                            = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/OS/CentOS7.pm'}                    = 'script/elevate-cpanel.PL.static';
     $INC{'Elevate/OS/CloudLinux7.pm'}                = 'script/elevate-cpanel.PL.static';
@@ -153,10 +153,6 @@ BEGIN {    # Suppress load of all of these at earliest point.
                 return $sub->( $cpev, @args );
             }
         }
-    }
-
-    sub _build_cpconf ($self) {
-        return Cpanel::Config::LoadCpConf::loadcpconf() // {};
     }
 
     sub is_check_mode ( $self, @args ) {
@@ -714,7 +710,7 @@ BEGIN {    # Suppress load of all of these at earliest point.
 
         if ( $self->is_check_mode() ) {
             INFO( <<~"EOS" );
-        You can upgrade your installation of $database_type_name using the following command:
+        You can manually upgrade your installation of $database_type_name using the following command:
 
             /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=$upgrade_version
 
@@ -731,18 +727,25 @@ BEGIN {    # Suppress load of all of these at earliest point.
 
     EOS
 
-        if (
-            !IO::Prompt::prompt(
-                '-one_char',
-                '-yes_no',
-                '-tty',
-                -default => 'n',
-                "Do you consent to upgrading to $upgrade_dbtype_name $upgrade_version [y/N]: ",
-            )
-        ) {
-            return $self->has_blocker( <<~"EOS" );
-        The system cannot be elevated to $pretty_distro_name until $database_type_name has been upgraded.
-        EOS
+        if ( !$self->getopt('non-interactive') ) {
+            if (
+                !IO::Prompt::prompt(
+                    '-one_char',
+                    '-yes_no',
+                    '-tty',
+                    -default => 'y',
+                    "Do you consent to upgrading to $upgrade_dbtype_name $upgrade_version [Y/n]: ",
+                )
+            ) {
+                return $self->has_blocker( <<~"EOS" );
+            The system cannot be elevated to $pretty_distro_name until $database_type_name has been upgraded. To upgrade manually:
+
+            /usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=$upgrade_version
+
+            To have have this script perform the upgrade, run this script again and consent to allow it to upgrade $upgrade_dbtype_name $upgrade_version.
+
+            EOS
+            }
         }
 
         Elevate::StageFile::update_stage_file( { 'mysql-version' => $upgrade_version } );
@@ -4543,9 +4546,9 @@ EOS
 
 }    # --- END lib/Elevate/Components/AutoSSL.pm
 
-{    # --- BEGIN lib/Elevate/Components/Database.pm
+{    # --- BEGIN lib/Elevate/Components/DatabaseUpgrade.pm
 
-    package Elevate::Components::Database;
+    package Elevate::Components::DatabaseUpgrade;
 
     use cPstrict;
 
@@ -4564,7 +4567,7 @@ EOS
 
         return if Elevate::Database::is_database_version_supported( Elevate::Database::get_local_database_version() );
 
-        $self->upgrade_database_server();
+        Elevate::Database::upgrade_database_server();
 
         return;
     }
@@ -4574,37 +4577,9 @@ EOS
         return;
     }
 
-    sub upgrade_database_server ($self) {
-
-        require Whostmgr::Mysql::Upgrade;
-
-        my $upgrade_version = Elevate::StageFile::read_stage_file( 'mysql-version', '' );
-        $upgrade_version ||= Elevate::Database::get_default_upgrade_version();
-
-        my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
-
-        INFO("Beginning upgrade to $upgrade_dbtype_name $upgrade_version");
-
-        my $failed_step = Whostmgr::Mysql::Upgrade::unattended_upgrade(
-            {
-                upgrade_type     => 'unattended_automatic',
-                selected_version => $upgrade_version,
-            }
-        );
-
-        if ($failed_step) {
-            FATAL("FAILED to upgrade to $upgrade_dbtype_name $upgrade_version");
-        }
-        else {
-            INFO("Finished upgrade to $upgrade_dbtype_name $upgrade_version");
-        }
-
-        return;
-    }
-
     1;
 
-}    # --- END lib/Elevate/Components/Database.pm
+}    # --- END lib/Elevate/Components/DatabaseUpgrade.pm
 
 {    # --- BEGIN lib/Elevate/OS.pm
 
@@ -4989,7 +4964,7 @@ EOS
             WARN("Error encountered querying the version from the database server: $exception");
 
             my $cpconf = Cpanel::Config::LoadCpConf::loadcpconf();
-            $version = $cpconf->{'mysql-version'};
+            $version = $cpconf->{'mysql-version'} // '';
         }
 
         return $version;
@@ -5009,6 +4984,34 @@ EOS
 
     sub get_database_type_name_from_version ($version) {
         return Cpanel::MariaDB::version_is_mariadb($version) ? 'MariaDB' : 'MySQL';
+    }
+
+    sub upgrade_database_server () {
+
+        require Whostmgr::Mysql::Upgrade;
+
+        my $upgrade_version = Elevate::StageFile::read_stage_file( 'mysql-version', '' );
+        $upgrade_version ||= Elevate::Database::get_default_upgrade_version();
+
+        my $upgrade_dbtype_name = Elevate::Database::get_database_type_name_from_version($upgrade_version);
+
+        INFO("Beginning upgrade to $upgrade_dbtype_name $upgrade_version");
+
+        my $failed_step = Whostmgr::Mysql::Upgrade::unattended_upgrade(
+            {
+                upgrade_type     => 'unattended_automatic',
+                selected_version => $upgrade_version,
+            }
+        );
+
+        if ($failed_step) {
+            FATAL("FAILED to upgrade to $upgrade_dbtype_name $upgrade_version");
+        }
+        else {
+            INFO("Finished upgrade to $upgrade_dbtype_name $upgrade_version");
+        }
+
+        return;
     }
 
     1;
@@ -6811,7 +6814,7 @@ use Elevate::Components::RmMod              ();
 use Elevate::Components::WPToolkit          ();
 use Elevate::Components::SSH                ();
 use Elevate::Components::AutoSSL            ();
-use Elevate::Components::Database           ();
+use Elevate::Components::DatabaseUpgrade    ();
 
 # - fatpack OS
 use Elevate::OS              ();
@@ -7552,7 +7555,7 @@ sub run_stage_2 ($self) {
     $self->ssystem_and_die(qw{/scripts/update-packages});
     $self->ssystem_and_die(qw{/usr/bin/yum -y update});
 
-    $self->run_component_once( 'Database' => 'pre_leapp' );
+    $self->run_component_once( 'DatabaseUpgrade' => 'pre_leapp' );
 
     $self->disable_all_cpanel_services();
 
