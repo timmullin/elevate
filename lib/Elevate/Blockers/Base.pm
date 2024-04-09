@@ -17,7 +17,6 @@ use Cpanel::JSON ();
 
 use Simple::Accessor qw(
   blockers
-  cpconf
 );
 
 use Log::Log4perl qw(:easy);

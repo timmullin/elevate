@@ -23,7 +23,7 @@ use Log::Log4perl qw(:easy);
 
 use constant MYSQL_BIN => '/usr/sbin/mysqld';
 
-use constant SUPPORTED_MYSQL_VERSIONS => qw{
+use constant SUPPORTED_CPANEL_MYSQL_VERSIONS => qw{
   8.0
   10.3
   10.4
@@ -108,7 +108,7 @@ sub get_local_database_version () {
 
 sub is_database_version_supported ($version) {
 
-    return scalar grep { $version eq $_ } SUPPORTED_MYSQL_VERSIONS;
+    return scalar grep { $version eq $_ } SUPPORTED_CPANEL_MYSQL_VERSIONS;
 }
 
 sub get_default_upgrade_version () {
