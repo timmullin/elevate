@@ -44,6 +44,34 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
 }
 
 {
+    note 'Remote MySQL blocker';
+
+    clear_messages_seen();
+
+    my $is_remote_mysql = 0;
+
+    my $mock_basic = Test::MockModule->new('Cpanel::MysqlUtils::MyCnf::Basic');
+    $mock_basic->redefine(
+        is_remote_mysql => sub { return $is_remote_mysql; },
+    );
+
+    is( $db->_blocker_remote_mysql(), 0, 'No blocker if remote MySQL disabled' );
+    no_messages_seen();
+
+    # Test blocker on remote mysql
+    $is_remote_mysql = 1;
+    like(
+        $db->_blocker_remote_mysql(),
+        {
+            id  => q[Elevate::Blockers::Databases::_blocker_remote_mysql],
+            msg => qr/The system is currently setup to use a remote database server/,
+        },
+        'Returns blocker if remote MySQL is enabled'
+    );
+    message_seen( 'WARN', qr/remote database server/ );
+}
+
+{
     note 'cPanel MySQL behavior';
 
     clear_messages_seen();
@@ -54,7 +82,6 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
     my $stash           = undef;
     my $is_check_mode   = 1;
     my $os_pretty_name  = 'ShinyOS';
-    my $is_remote_mysql = 0;
     my $user_consent    = 0;
 
     my $mock_db = Test::MockModule->new('Elevate::Database');
@@ -76,11 +103,6 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
         upgrade_to_pretty_name => sub { return $os_pretty_name; },
     );
 
-    my $mock_basic = Test::MockModule->new('Cpanel::MysqlUtils::MyCnf::Basic');
-    $mock_basic->redefine(
-        is_remote_mysql => sub { return $is_remote_mysql; },
-    );
-
     my $mock_io_prompt = Test::MockModule->new('IO::Prompt');
     $mock_io_prompt->redefine(
         prompt => sub { return $user_consent; },
@@ -95,30 +117,8 @@ my $mock_elevate = Test::MockFile->file('/var/cpanel/elevate');
     $is_db_supported = 0;
     $stash           = undef;
 
-    # Test blocker on remote mysql
-    $is_remote_mysql = 1;
-    is(
-        $db->_blocker_old_cpanel_mysql(),
-        {
-            id  => q[Elevate::Blockers::Databases::_blocker_old_cpanel_mysql],
-            msg => <<~"EOS",
-            The system is currently setup to use a remote database server.
-            We cannot upgrade the local installation of OldDB $test_db_version
-            unless the system is configured to use the local database server.
-            EOS
-        },
-        'Returns blocker if remote MySQL is enabled'
-    );
-    message_seen(
-        'WARN',
-        qr/You have OldDB $test_db_version installed.\nThis version is not available for $os_pretty_name/
-    );
-    message_seen( 'WARN', qr/remote database server/ );
-    is( $stash, undef, 'Stage file not updated due to blocker' );
-
     # Test warning for check mode
-    $is_remote_mysql = 0;
-    $is_check_mode   = 1;
+    $is_check_mode = 1;
     is( $db->_blocker_old_cpanel_mysql(), 0,     "Check mode returns 0" );
     is( $stash,                           undef, 'Stage file not updated due to running a check' );
     message_seen(

@@ -34,6 +34,7 @@ sub check ($self) {
     my $ok = 1;
     $self->_warning_if_postgresql_installed;
     $ok = 0 unless $self->_blocker_acknowledge_postgresql_datadir;
+    $ok = 0 unless $self->_blocker_remote_mysql;
     $ok = 0 unless $self->_blocker_old_mysql;
     $ok = 0 unless $self->_blocker_mysql_upgrade_in_progress;
     $self->_warning_mysql_not_enabled();
@@ -106,6 +107,23 @@ sub _has_mapped_postgresql_dbs ($self) {
     return ( keys %user_hash );
 }
 
+sub _blocker_remote_mysql ($self) {
+
+    my $pretty_distro_name = $self->upgrade_to_pretty_name();
+
+    # If we are setup to use remote MySQL, then attempting an upgrade will fail
+    # TODO: Temporarily disable remote MySQL to allow the database upgrade
+    if ( Cpanel::MysqlUtils::MyCnf::Basic::is_remote_mysql() ) {
+        return $self->has_blocker( <<~"EOS" );
+        The system is currently setup to use a remote database server.
+        We cannot elevate the system to $pretty_distro_name
+        unless the system is configured to use the local database server.
+        EOS
+    }
+
+    return 0;
+}
+
 sub _blocker_old_mysql ($self) {
 
     my $mysql_is_provided_by_cloudlinux = Elevate::Database::is_database_provided_by_cloudlinux(0);
@@ -165,16 +183,6 @@ sub _blocker_old_cpanel_mysql ($self) {
     This version is not available for $pretty_distro_name.
 
     EOS
-
-    # If we are setup to use remote MySQL, then attempting an upgrade will fail
-    # TODO: Temporarily disable remote MySQL to allow the database upgrade
-    if ( Cpanel::MysqlUtils::MyCnf::Basic::is_remote_mysql() ) {
-        return $self->has_blocker( <<~"EOS" );
-        The system is currently setup to use a remote database server.
-        We cannot upgrade the local installation of $database_type_name $mysql_version
-        unless the system is configured to use the local database server.
-        EOS
-    }
 
     if ( $self->is_check_mode() ) {
         INFO( <<~"EOS" );
