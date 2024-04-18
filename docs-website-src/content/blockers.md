@@ -49,13 +49,13 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
 * Some **EA4 packages** are not supported on AlmaLinux 8.
   * Example: PHP versions 5.4 through 7.1 are available on CentOS 7 but not AlmaLinux 8. You would need to remove these packages before upgrading. Doing so might impact your system users. Proceed with caution.
 * The system **must** be able to control the boot process by changing the GRUB2 configuration.
-  * The reason for this is that the framework which performs the upgrade of distro-provided software needs to be able to run a custom early boot environment (initrd) in order to safely upgrade the distro.
+  * The reason for this is that the framework which performs the upgrade of distribution-provided software needs to be able to run a custom early boot environment (initrd) in order to safely upgrade the distribution.
   * We check for this by seeing whether the kernel the system is currently running is the same version as that which the system believes is the default boot option.
 * Your machine has multiple network interface cards (NICs) using kernel-names (`ethX`).
   * Since `ethX` style names are automatically assigned by the kernel, there is no guarantee that this name will remain the same upon upgrade to a new kernel version tier.
-  * The "default" approach in `network-scripts` config files of specificying NICs by `DEVICE` can cause issues due to the above.
+  * The "default" approach in `network-scripts` config files of specifying NICs by `DEVICE` can cause issues due to the above.
   * A more in-depth explanation of *why* this is a problem (and what to do about it) can be found at [freedesktop.org](https://www.freedesktop.org/wiki/Software/systemd/PredictableNetworkInterfaceNames/).
-  * One way to prevent these isssues is to assign a name you want in the configuration and re-initialize NICs ahead of time.
+  * One way to prevent these issues is to assign a name you want in the configuration and re-initialize NICs ahead of time.
 
 # Other Known Issues
 
@@ -63,7 +63,7 @@ The following is a list of other known issues that could prevent your server's s
 
 ## PostgreSQL
 
-If you are using the PostgreSQL software provided by your distro (which includes PostgreSQL as installed by cPanel), ELevate will upgrade the software packages. However, your PostgreSQL service is unlikely to start properly. The reason for this is that ELevate will **not** attempt to update the data directory being used by your PostgreSQL instance to store settings and databases; and PostgreSQL will detect this condition and refuse to start, to protect your data from corruption, until you have performed this update.
+If you are using the PostgreSQL software provided by your distribution (which includes PostgreSQL as installed by cPanel), ELevate will upgrade the software packages. However, your PostgreSQL service is unlikely to start properly. The reason for this is that ELevate will **not** attempt to update the data directory being used by your PostgreSQL instance to store settings and databases; and PostgreSQL will detect this condition and refuse to start, to protect your data from corruption, until you have performed this update.
 
 To ensure that you are aware of this requirement, if it detects that one or more cPanel accounts have associated PostgreSQL databases, ELevate will block you from beginning the upgrade process until you have created a file at `/var/cpanel/acknowledge_postgresql_for_elevate`.
 
