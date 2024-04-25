@@ -7,7 +7,7 @@ layout: single
 
 # Known Blockers
 
-The following is a list of install states which the script will intentionally prevent you from upgrading with. This is because the script cannot garantuee a successful upgrade with these conditions in place.
+The following is a list of install states which the script will intentionally prevent you from upgrading with. This is because the script cannot guarantee a successful upgrade with these conditions in place.
 
 ## Basic checks
 
@@ -22,7 +22,7 @@ The following conditions are assumed to be in place any time you run this script
 
 ## Conflicting Processes
 
-The following processes are known to conflict with this script and cannot be executed simulaneously.
+The following processes are known to conflict with this script and cannot be executed simultaneously.
 
 * `/usr/local/cpanel/scripts/upcp`
 * `/usr/local/cpanel/bin/backup`
@@ -44,11 +44,11 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
 * **cPanel is up to date**
   * You will need to be on a version mentioned in the "Latest cPanel & WHM Builds (All Architectures)" section at http://httpupdate.cpanel.net/
   * Mitigation: `/usr/local/cpanel/scripts/upcp`
-* **nameserver**
-  * cPanel provides support for a myriad of nameservers. (MyDNS, nsd, bind, powerdns). On RHEL 8 based distros, it is preferred that you always be on PowerDNS.
+* **Name Server**
+  * cPanel provides support for a myriad of name servers. (MyDNS, NSD, bind, PowerDNS). On RHEL 8 based distributions, it is preferred that you always be on PowerDNS.
   * Mitigation: `/scripts/setupnameserver powerdns`
 * **MySQL**
-  * If the version of MySQL/MariaDB installed on the system is not supported on RHEL 8 based distros, it will need to be upgraded to a version that is. If the MySQL installation is managed by cPanel we will offer to upgrade MySQL automatically to MariaDB 10.6 during elevation. Declining the offer to upgrade MySQL will block the elevation. If the MySQL installation is managed by CloudLinux, then the upgrade must be performed manually.  This can be done by running the following command:
+  * If the version of MySQL/MariaDB installed on the system is not supported on RHEL 8 based distributions, it will need to be upgraded to a version that is. If the MySQL installation is managed by cPanel we will offer to upgrade MySQL automatically to MariaDB 10.6 during elevation. Declining the offer to upgrade MySQL will block the elevation. If the MySQL installation is managed by CloudLinux, then the upgrade must be performed manually.  This can be done by running the following command:
   `/usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=10.6`
   You will need to wait for the upgrade to be complete before re-running the elevate script. Elevation will block if a MySQL upgrade is in progress.
   * The system **must** not be setup to use a remote database server.
@@ -65,7 +65,7 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
   * One way to prevent these issues is to assign a name you want in the configuration and re-initialize NICs ahead of time.
 * Running the system in a container-like environment is not supported by leapp. We block on this condition unless using the --no-leapp option.
 * If running JetBackup, it **must** be version 5 or greater. Earlier versions are not supported.
-* On **CentOS** 7, the system **must not** have Python 3.6 installed; this will interfer with the upgrade. On **CloudLinux** this is not an issue.
+* On **CentOS** 7, the system **must not** have Python 3.6 installed; this will interfere with the upgrade. On **CloudLinux** this is not an issue.
 * Elevation will block if the sshd config file is absent or cannot be read.
 * These issues with the YUM repositories can ELevate to block:
   * Invalid syntax or use of `\$`. That character is interpolated on RHEL 7 based systems, but not on systems that are RHEL 8 based.
@@ -93,7 +93,7 @@ Once ELevate has completed, you should then perform the update to the PostgreSQL
 
 ## Using OVH proactive intervention monitoring
 
-If you are using a dedicated server hosted at OVH, you should **disable the `proactive monitoring` before starting** the elevation process.  To indiciate you have done this, you must create the touch file `/var/cpanel/acknowledge_ovh_monitoring_for_elevate` or elevation will block when it detects that the system is hosted by OVH.
+If you are using a dedicated server hosted at OVH, you should **disable the `proactive monitoring` before starting** the elevation process.  To indicate you have done this, you must create the touch file `/var/cpanel/acknowledge_ovh_monitoring_for_elevate` or elevation will block when it detects that the system is hosted by OVH.
 The proactive monitoring incorrectly detects an issue on your server during one of the reboots.
 Your server would then boot to a rescue mode, interrupting the elevation upgrade.
 
