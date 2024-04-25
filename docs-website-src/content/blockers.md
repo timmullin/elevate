@@ -13,9 +13,12 @@ The following is a list of install states which the script will intentionally pr
 
 The following conditions are assumed to be in place any time you run this script:
 
-* You have **CentOS** or **CloudLinux** 7.9 or greater installed.
-* You have cPanel version 110 installed.
 * You are logged in as **root**.
+* The system is running **CentOS** or **CloudLinux** 7.9.
+* You have cPanel version 110 installed.
+* cPanel does not require an update.
+* cPanel has a valid license.
+* **CloudLinux** has a valid license (if applicable).
 
 ## Conflicting Processes
 
@@ -45,13 +48,17 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
   * cPanel provides support for a myriad of nameservers. (MyDNS, nsd, bind, powerdns). On RHEL 8 based distros, it is preferred that you always be on PowerDNS.
   * Mitigation: `/scripts/setupnameserver powerdns`
 * **MySQL**
-  * We will upgrade you automatically to MariaDB 10.6 during elevation if you do not do this in advance.
+  * If the version of MySQL/MariaDB installed on the system is not supported on RHEL 8 based distros, it will need to be upgraded to a version that is. If the MySQL installation is managed by cPanel we will offer to upgrade you automatically to MariaDB 10.6 during elevation. Declining the offer to upgrade MySQL will block the elevation. If the MySQL installation is managed by CloudLinux, then the upgrade must be performed manually.  This can be done by running the following command:
+  `/usr/local/cpanel/bin/whmapi1 start_background_mysql_upgrade version=10.6`
+  You will need to wait for the upgrade to be complete before re-running the elevate script. Elevation will block if a MySQL upgrade is in progress.
+  * The system **must** not be setup to use a remote database server.
 * Some **EA4 packages** are not supported on AlmaLinux 8.
   * Example: PHP versions 5.4 through 7.1 are available on CentOS 7 but not AlmaLinux 8. You would need to remove these packages before upgrading. Doing so might impact your system users. Proceed with caution.
-* The system **must** be able to control the boot process by changing the GRUB2 configuration.
-  * The reason for this is that the framework which performs the upgrade of distribution-provided software needs to be able to run a custom early boot environment (initrd) in order to safely upgrade the distribution.
+* The system **must** be able to control the boot process by changing the GRUB2 configuration (unless using the --no-leap option).
+  * The reason for this is that the leapp framework which performs the upgrade of distribution-provided software needs to be able to run a custom early boot environment (initrd) in order to safely upgrade the distribution.
   * We check for this by seeing whether the kernel the system is currently running is the same version as that which the system believes is the default boot option.
-* Your machine has multiple network interface cards (NICs) using kernel-names (`ethX`).
+  * We also check that there is a valid GRUB2 config.
+* We block if your machine has multiple network interface cards (NICs) using kernel-names (`ethX`) (unless using --no-leapp).
   * Since `ethX` style names are automatically assigned by the kernel, there is no guarantee that this name will remain the same upon upgrade to a new kernel version tier.
   * The "default" approach in `network-scripts` config files of specifying NICs by `DEVICE` can cause issues due to the above.
   * A more in-depth explanation of *why* this is a problem (and what to do about it) can be found at [freedesktop.org](https://www.freedesktop.org/wiki/Software/systemd/PredictableNetworkInterfaceNames/).
@@ -78,7 +85,7 @@ Once ELevate has completed, you should then perform the update to the PostgreSQL
 
 ## Using OVH proactive intervention monitoring
 
-If you are using a dedicated server hosted at OVH, you should **disable the `proactive monitoring` before starting** the elevation process.
+If you are using a dedicated server hosted at OVH, you should **disable the `proactive monitoring` before starting** the elevation process.  To indiciate you have done this, you must create the touch file `/var/cpanel/acknowledge_ovh_monitoring_for_elevate` or elevation will block when it detects that the system is hosted by OVH.
 The proactive monitoring incorrectly detects an issue on your server during one of the reboots.
 Your server would then boot to a rescue mode, interrupting the elevation upgrade.
 
