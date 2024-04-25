@@ -19,6 +19,8 @@ The following conditions are assumed to be in place any time you run this script
 * cPanel does not require an update.
 * cPanel has a valid license.
 * **CloudLinux** has a valid license (if applicable).
+* The `elevate-cpanel` script must be running from: `/scripts` or `/usr/local/cpanel/scripts`
+* The `elevate-cpanel` script must be up to date.
 
 ## Conflicting Processes
 
@@ -45,7 +47,7 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
   * You will need to be on a version mentioned in the "Latest cPanel & WHM Builds (All Architectures)" section at http://httpupdate.cpanel.net/
   * Mitigation: `/usr/local/cpanel/scripts/upcp`
 * **Name Server**
-  * cPanel provides support for a myriad of name servers. (MyDNS, NSD, bind, PowerDNS). On RHEL 8 based distributions, it is preferred that you always be on PowerDNS.
+  * cPanel provides support for a myriad of name servers. (MyDNS, NSD, BIND, PowerDNS). On RHEL 8 based distributions, it is preferred that you always be on PowerDNS.
   * Mitigation: `/scripts/setupnameserver powerdns`
 * **MySQL**
   * If the version of MySQL/MariaDB installed on the system is not supported on RHEL 8 based distributions, it will need to be upgraded to a version that is. If the MySQL installation is managed by cPanel we will offer to upgrade MySQL automatically to MariaDB 10.6 during elevation. Declining the offer to upgrade MySQL will block the elevation. If the MySQL installation is managed by CloudLinux, then the upgrade must be performed manually.  This can be done by running the following command:
@@ -54,7 +56,7 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
   * The system **must** not be setup to use a remote database server.
 * Some **EA4 packages** are not supported on AlmaLinux 8.
   * Example: PHP versions 5.4 through 7.1 are available on CentOS 7 but not AlmaLinux 8. You would need to remove these packages before upgrading. Doing so might impact your system users. Proceed with caution.
-* The system **must** be able to control the boot process by changing the GRUB2 configuration (unless using the --no-leap option).
+* The system **must** be able to control the boot process by changing the GRUB2 configuration (unless using the --no-leapp option).
   * The reason for this is that the leapp framework which performs the upgrade of distribution-provided software needs to be able to run a custom early boot environment (initrd) in order to safely upgrade the distribution.
   * We check for this by seeing whether the kernel the system is currently running is the same version as that which the system believes is the default boot option.
   * We also check that there is a valid GRUB2 config.
@@ -98,3 +100,7 @@ The proactive monitoring incorrectly detects an issue on your server during one 
 Your server would then boot to a rescue mode, interrupting the elevation upgrade.
 
 [Read more about OVH monitoring](https://support.us.ovhcloud.com/hc/en-us/articles/115001821044-Overview-of-OVHcloud-Monitoring-on-Dedicated-Servers)
+
+# Leapp preupgrade (dry run) check
+
+If no issues are found, Elevate will perform one more check before performing the upgrade: it will perform a "dry run" of the leapp upgrade by executing `leapp preupgrade`.  This will point out any problems that leapp would encounter during the actual upgrade.  If any errors are found, they will need to be addressed before performing the upgrade.  This test is only performed when the script is invoked with the --start option (and not with the --no-leapp option).
