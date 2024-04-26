@@ -50,13 +50,13 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
   * cPanel provides support for a myriad of name servers. (MyDNS, NSD, BIND, PowerDNS). On RHEL 8 based distributions, it is preferred that you always be on PowerDNS.
   * Mitigation: `/scripts/setupnameserver powerdns`
 * **MySQL**
-  * If the version of MySQL/MariaDB installed on the system is not supported on RHEL 8 based distributions, it **must** be upgraded to a version that is. If the MySQL installation is managed by cPanel we will offer to upgrade MySQL automatically to MariaDB 10.6 during elevation.
+  * If the version of MySQL/MariaDB installed on the system is not supported on RHEL 8 based distributions, you **must** upgrade to a supported version. If cPanel manages the MySQL installation, we will offer to upgrade MySQL automatically to MariaDB 10.6 during elevation.
   * Elevation will block if a MySQL upgrade is in progress.
   * The system **must** not be setup to use a remote database server.
 * Some **EA4 packages** are not supported on AlmaLinux 8.
   * Example: PHP versions 5.4 through 7.1 are available on CentOS 7 but not AlmaLinux 8. You would need to remove these packages before upgrading. Doing so might impact your system users. Proceed with caution.
 * The system **must** be able to control the boot process by changing the GRUB2 configuration.
-  * The reason for this is that the leapp framework which performs the upgrade of distribution-provided software needs to be able to run a custom early boot environment (initrd) in order to safely upgrade the distribution.
+  * The reason for this is that the Leapp framework, which performs the upgrade of distribution-provided software, needs to be able to run a custom early boot environment (initrd) in order to safely upgrade the distribution.
   * We check for this by seeing whether the kernel the system is currently running is the same version as that which the system believes is the default boot option.
   * We also check that there is a valid GRUB2 config.
 * We block if your machine has multiple network interface cards (NICs) using kernel-names (`ethX`).
@@ -67,9 +67,9 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
 * Running the system in a container-like environment is not supported.
 * If running JetBackup, it **must** be version 5 or greater. Earlier versions are not supported.
 * On **CentOS** 7, the system **must not** have Python 3.6 installed; this will interfere with the upgrade. On **CloudLinux** this is not an issue.
-* Elevation will block if the sshd config file is absent or cannot be read.
+* Elevation will block if the `sshd` config file is absent or unreadable.
 * These issues with the YUM repositories can cause ELevate to block:
-  * Invalid syntax or use of `\$`. That character is interpolated on RHEL 7 based systems, but not on systems that are RHEL 8 based.
+  * Invalid syntax or use of `\$`. That character is interpolated on RHEL 7 based systems but not on systems that are RHEL 8 based.
   * Any unsupported repositories that have packages installed
   * If YUM is in an unstable state (running `yum makecache` fails).
 
@@ -102,4 +102,4 @@ Your server would then boot to a rescue mode, interrupting the elevation upgrade
 
 # Leapp preupgrade (dry run) check
 
-If no issues are found, Elevate will perform one more check before performing the upgrade: it will perform a "dry run" of the leapp upgrade by executing `leapp preupgrade`.  This will point out any problems that leapp would encounter during the actual upgrade.  If any errors are found, they will need to be addressed before performing the upgrade.  This test is only performed when the script is invoked with the --start option.
+If no issues are found, Elevate will perform one more check before performing the upgrade: it will perform a "dry run" of the Leapp upgrade by executing `leapp preupgrade`.  This will point out any problems that Leapp would encounter during the actual upgrade.  If any errors are found, they will need to be addressed before performing the upgrade.  This test is only performed when the script is invoked with the --start option.
