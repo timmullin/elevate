@@ -46,9 +46,6 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
 * **cPanel is up to date**
   * You will need to be on a version mentioned in the "Latest cPanel & WHM Builds (All Architectures)" section at http://httpupdate.cpanel.net/
   * Mitigation: `/usr/local/cpanel/scripts/upcp`
-* **Name Server**
-  * cPanel provides support for a myriad of name servers. (MyDNS, NSD, BIND, PowerDNS). On RHEL 8 based distributions, it is preferred that you always be on PowerDNS.
-  * Mitigation: `/scripts/setupnameserver powerdns`
 * **MySQL**
   * If the version of MySQL/MariaDB installed on the system is not supported on RHEL 8 based distributions, you **must** upgrade to a supported version. If cPanel manages the MySQL installation, we will offer to upgrade MySQL automatically to MariaDB 10.6 during elevation.
   * Elevation will block if a MySQL upgrade is in progress.
@@ -63,7 +60,7 @@ You can discover many of these issues by downloading `elevate-cpanel` and runnin
   * Since `ethX` style names are automatically assigned by the kernel, there is no guarantee that this name will remain the same upon upgrade to a new kernel version tier.
   * The "default" approach in `network-scripts` config files of specifying NICs by `DEVICE` can cause issues due to the above.
   * A more in-depth explanation of *why* this is a problem (and what to do about it) can be found at [freedesktop.org](https://www.freedesktop.org/wiki/Software/systemd/PredictableNetworkInterfaceNames/).
-  * One way to prevent these issues is to assign a name you want in the configuration and re-initialize NICs ahead of time.
+  * One way to prevent these issues is to assign a custom name in the configuration and re-initialize NICs ahead of time.
 * Running the system in a container-like environment is not supported.
 * If running JetBackup, it **must** be version 5 or greater. Earlier versions are not supported.
 * On **CentOS** 7, the system **must not** have Python 3.6 installed; this will interfere with the upgrade. On **CloudLinux** this is not an issue.
