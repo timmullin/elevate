@@ -47,7 +47,7 @@ sub _build_service ($self) {
 
 =cut
 
-sub pre_leapp ($self) {
+sub pre_distro_upgrade ($self) {
     if ( Cpanel::Pkgr::is_installed('postgresql-server') ) {
         $self->_store_postgresql_encoding_and_locale();
         $self->_disable_postgresql_service();
@@ -183,7 +183,7 @@ sub _backup_postgresql_datadir ($self) {
 
 =cut
 
-sub post_leapp ($self) {
+sub post_distro_upgrade ($self) {
     if ( Cpanel::Pkgr::is_installed('postgresql-server') ) {
         $self->_perform_config_workaround();
         $self->_perform_postgresql_upgrade();

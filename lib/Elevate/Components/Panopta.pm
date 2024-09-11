@@ -20,7 +20,7 @@ use Cpanel::Pkgr ();
 
 use parent qw{Elevate::Components::Base};
 
-sub pre_leapp ($self) {
+sub pre_distro_upgrade ($self) {
 
     if ( Cpanel::Pkgr::is_installed('panopta-agent') ) {
 
@@ -30,7 +30,7 @@ sub pre_leapp ($self) {
     return;
 }
 
-sub post_leapp ($self) {
+sub post_distro_upgrade ($self) {
 
     return;
 }

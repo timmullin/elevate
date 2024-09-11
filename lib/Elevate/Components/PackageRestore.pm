@@ -34,7 +34,7 @@ sub _get_packages_to_check () {
     };
 }
 
-sub pre_leapp ($self) {
+sub pre_distro_upgrade ($self) {
 
     my @package_list = _get_packages_to_check();
     my @installed_packages;
@@ -56,7 +56,7 @@ sub pre_leapp ($self) {
     return;
 }
 
-sub post_leapp ($self) {
+sub post_distro_upgrade ($self) {
 
     my $package_info = Elevate::StageFile::read_stage_file('packages_to_restore');
     return unless defined $package_info and ref $package_info eq 'HASH';
