@@ -149,7 +149,7 @@ my @TEST_DATA = (
         fail_msg => q/Option "clean" is not compatible with any other option/,
     },
     {
-        options  => [qw/--continue --no-leapp/],
+        options  => [qw/--continue --no-distro-upgrade/],
         passed   => 0,
         fail_msg => q/Option "continue" is not compatible with any other option/,
     },
@@ -164,7 +164,7 @@ my @TEST_DATA = (
         fail_msg => q/Option "service" is not compatible with any other option/,
     },
     {
-        options  => [qw/--status --no-leapp/],
+        options  => [qw/--status --no-distro-upgrade/],
         passed   => 0,
         fail_msg => q/Option "status" is not compatible with any other option/,
     },
@@ -191,7 +191,7 @@ my @TEST_DATA = (
         warning_regex => qr/Unknown option/,
     },
     {
-        options       => [qw/--check --upgrade-to almalinux --skip-cpanel-version-check --skip-elevate-version-check --no-leapp/],
+        options       => [qw/--check --upgrade-to almalinux --skip-cpanel-version-check --skip-elevate-version-check --no-distro-upgrade/],
         passed        => 0,
         fail_msg      => 'Invalid Option',
         warning_regex => qr/Unknown option/,
@@ -223,7 +223,7 @@ my @TEST_DATA = (
         warning_regex => qr/Unknown option/,
     },
     {
-        options       => [qw/--start --upgrade-to rocky  --skip-cpanel-version-check --skip-elevate-version-check --no-leapp --manual-reboots --non-interactive/],
+        options       => [qw/--start --upgrade-to rocky  --skip-cpanel-version-check --skip-elevate-version-check --no-distro-upgrade --manual-reboots --non-interactive/],
         passed        => 0,
         fail_msg      => 'Invalid Option',
         warning_regex => qr/Unknown option/,

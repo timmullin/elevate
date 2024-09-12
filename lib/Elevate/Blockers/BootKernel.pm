@@ -28,7 +28,7 @@ use Try::Tiny;
 
 sub check ($self) {
 
-    return 1 unless $self->should_upgrade_distro;    # skip when --no-leapp is provided
+    return 1 unless $self->should_upgrade_distro;    # skip when --no-distro-upgrade is provided
 
     my $ok = 0;
     try {

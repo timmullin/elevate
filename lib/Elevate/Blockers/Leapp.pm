@@ -23,7 +23,7 @@ sub check ($self) {
 
     return if $self->is_check_mode();    # skip for --check
 
-    return unless $self->should_upgrade_distro;    # skip when --no-leapp is provided
+    return unless $self->should_upgrade_distro;    # skip when --no-distro-upgrade is provided
 
     return if ( $self->blockers->num_blockers_found() > 0 );    # skip if any blockers have already been found
 

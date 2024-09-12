@@ -33,7 +33,7 @@ sub GRUB2_PREFIX_RHEL   { return '/boot/grub2' }
 
 sub check ($self) {
 
-    return 1 unless $self->should_upgrade_distro;    # skip when --no-leapp is provided
+    return 1 unless $self->should_upgrade_distro;    # skip when --no-distro-upgrade is provided
 
     my $ok = 1;
     $ok = 0 unless $self->_blocker_grub2_workaround;
