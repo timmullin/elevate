@@ -6,7 +6,7 @@ package Elevate::Components::cPanelPrep;
 
 Elevate::Components::cPanelPrep
 
-Perform tasks to ensure cPanel is in a safe state to leapp.
+Perform tasks to ensure cPanel is in a safe state to upgrade the distro.
 
 =cut
 

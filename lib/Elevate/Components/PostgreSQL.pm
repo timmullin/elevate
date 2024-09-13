@@ -249,7 +249,7 @@ sub _perform_config_workaround ($self) {
 =item _perform_postgresql_upgrade
 
 Performs the upgrade using the EL-provided C<postgresql-setup --upgrade>
-script. If encoding and locale data were collected in the pre-leapp phase, use
+script. If encoding and locale data were collected in the pre distro upgrade phase, use
 them here when provisioning the new cluster.
 
 =cut

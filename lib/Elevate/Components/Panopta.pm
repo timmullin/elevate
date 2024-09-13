@@ -8,7 +8,7 @@ Elevate::Components::Panopta
 
 Handle situation where the Panopta agent is installed
 
-Before leapp:
+Before distro upgrade:
     Uninstall the Panopta agent since it is deprecated and
     not compatible with Elevate
 

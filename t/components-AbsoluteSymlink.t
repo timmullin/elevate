@@ -26,7 +26,7 @@ my %cabinet;
 $cabinet{'/smang'} = Test::MockFile->symlink( "/home", "/smang" );
 
 my $obj = bless {}, 'Elevate::Components::AbsoluteSymlinks';
-ok( !$obj->post_distro_upgrade(), "Nothing to do post leapp" );
+ok( !$obj->post_distro_upgrade(), "Nothing to do post distro upgrade" );
 is( { $obj->get_abs_symlinks() }, { '/smang' => '/home' }, "Got expected from get_abs_symlinks" );
 SKIP: {
     skip "Test::MockFile doesn't yet properly handle symlinks", 1;

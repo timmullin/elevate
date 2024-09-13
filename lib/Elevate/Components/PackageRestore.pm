@@ -8,12 +8,12 @@ Elevate::Components::PackageRestore
 
 Handle restoring packages that get removed during elevate
 
-Before leapp:
+Before distro upgrade:
     Detect which packages in our list are installed and
     store our findings.
 
-After leapp:
-    Reinstall any packages detected pre-leapp
+After distro upgrade:
+    Reinstall any packages detected pre distro upgrade
 
 =cut
 
