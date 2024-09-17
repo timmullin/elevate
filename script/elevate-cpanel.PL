@@ -64,7 +64,7 @@ CloudLinux 7 => CloudLinux 8
        --skip-cpanel-version-check               Skip the check for whether cPanel is up to date.
                                                  This option is intended only for testing!
 
-       --no-distro-upgrade                       Do not try to upgrade the distro, pause instead.
+       --upgrade-distro-manually                       Do not try to upgrade the distro, pause instead.
                                                  Once you have upgraded the distro you should remove the file
                                                  /waiting_for_distro_upgrade
 
@@ -137,14 +137,14 @@ the update process by running:
 By default, the elevate script runs the L<leapp process|https://almalinux.org/elevate/>
 to upgrade you from 7 to 8. `Leapp` may not be compatible with your system.
 
-Using the `--no-distro-upgrade` option gives you a way to do the actual distro upgrade in your own way.
+Using the `--upgrade-distro-manually` option gives you a way to do the actual distro upgrade in your own way.
 This, for instance, can be used to allow `Virtuozzo` systems to upgrade cPanel systems, which are not supported by `Leapp`.
 
-A `--no-distro-upgrade` upgrade would look like:
+A `--upgrade-distro-manually` upgrade would look like:
 
 =over
 
-=item 1. User runs `/scripts/elevate-cpanel --start --no-distro-upgrade` which starts the upgrade process.
+=item 1. User runs `/scripts/elevate-cpanel --start --upgrade-distro-manually` which starts the upgrade process.
 
 =item 2. `elevate-cpanel` does all preparatory steps to upgrade the system prior to the distro upgrade.
 
@@ -158,11 +158,11 @@ A `--no-distro-upgrade` upgrade would look like:
 
 =back
 
-=item 4. Elevate will resume upon reboot and complete the upgrade just like it would have without `--no-distro-upgrade`
+=item 4. Elevate will resume upon reboot and complete the upgrade just like it would have without `--upgrade-distro-manually`
 
 =back
 
-NOTE: `--no-distro-upgrade` is not required for helper commands like `--continue` or `--status`
+NOTE: `--upgrade-distro-manually` is not required for helper commands like `--continue` or `--status`
 
 =head1 WARNINGS
 
@@ -554,7 +554,7 @@ sub start ($self) {
 
     $self->_capture_env_variables();    # capture at startup
 
-    if ( $self->getopt('no-distro-upgrade') || $self->getopt('no-leapp') ) {
+    if ( $self->getopt('upgrade-distro-manually') || $self->getopt('no-leapp') ) {
         my $touchfile = PAUSE_ELEVATE_TOUCHFILE;
         WARN( <<~"EOS");
         'leapp' checks and run are disabled.
@@ -1494,9 +1494,9 @@ sub post_upgrade_check ($self) {
 sub should_upgrade_distro ($self) {
 
     # we store the no_distro_upgrade option, but prefer using a positive check instead
-    # we need to check to see if the no-distro-upgrade option is passed via CLI here too in order
-    # to allow users to run this script with the '--check --no-distro-upgrade' options
-    my $no_distro_upgrade = Elevate::StageFile::read_stage_file( 'no_distro_upgrade', 0 ) || $self->getopt('no-distro-upgrade') || $self->getopt('no-leapp');
+    # we need to check to see if the upgrade-distro-manually option is passed via CLI here too in order
+    # to allow users to run this script with the '--check --upgrade-distro-manually' options
+    my $no_distro_upgrade = Elevate::StageFile::read_stage_file( 'no_distro_upgrade', 0 ) || $self->getopt('upgrade-distro-manually') || $self->getopt('no-leapp');
     return !$no_distro_upgrade;
 }
 
