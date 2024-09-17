@@ -28,7 +28,7 @@ use Try::Tiny;
 
 sub check ($self) {
 
-    return 1 unless $self->should_upgrade_distro;    # skip when --upgrade-distro-manually is provided
+    return 1 unless $self->should_run_distro_upgrade;    # skip when --upgrade-distro-manually is provided
 
     my $ok = 0;
     try {

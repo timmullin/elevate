@@ -17,7 +17,7 @@ use Log::Log4perl qw(:easy);
 
 sub check ($self) {    # $self is a cpev object here
 
-    return 0 unless $self->should_upgrade_distro;
+    return 0 unless $self->should_run_distro_upgrade;
 
     if ( _is_container_envtype() ) {
         return $self->has_blocker( <<~'EOS');
