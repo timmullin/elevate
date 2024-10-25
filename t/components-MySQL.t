@@ -214,4 +214,78 @@ EOS
     is( $db->_blocker_old_mysql(), 0, '8.0 is supported by cPanel' );
 }
 
+{
+    note 'Test _blocker_mysql_database_corrupted';
+
+    clear_messages_seen();
+
+    my $is_mysql_running;
+    my $is_mysql_enabled;
+    my @mysql_check_output;
+
+    my $mock_db = Test::MockModule->new('Elevate::Database');
+    $mock_db->redefine(
+        get_local_database_version          => sub { return '5.7'; },
+        get_database_type_name_from_version => sub { return 'MySQL'; },
+    );
+
+    my $mock_mysqlutils = Test::MockModule->new('Cpanel::MysqlUtils::Running');
+    $mock_mysqlutils->redefine(
+        is_mysql_running => sub { return $is_mysql_running; },
+    );
+
+    my $mock_services = Test::MockModule->new('Cpanel::Services::Enabled');
+    $mock_services->redefine(
+        is_enabled => sub { return $is_mysql_enabled; },
+    );
+
+    my $mock_comp = Test::MockModule->new('Elevate::Components::MySQL');
+    $mock_comp->redefine(
+        'ssystem_capture_output' => sub {
+            return { status => 0, stdout => \@mysql_check_output, stderr => [] };
+        },
+    );
+
+    $is_mysql_running = 0;
+    $is_mysql_enabled = 0;
+
+    is( $db->_blocker_mysql_database_corrupted(), 0, 'Do not block if MySQL not running and not enabled' );
+    no_messages_seen();    # Don't complain if not running because not enabled;
+
+    $is_mysql_running = 0;
+    $is_mysql_enabled = 1;
+
+    is( $db->_blocker_mysql_database_corrupted(), 0, 'Do not block if MySQL not running and enabled' );
+    message_seen(
+        'WARN',
+        'MySQL is not running; this prevents us from verifying the integrity of the databases.'
+    );
+    no_messages_seen();    # Should only have been that one message
+
+    $is_mysql_running   = 1;
+    $is_mysql_enabled   = 1;
+    @mysql_check_output = (
+        'Warning  : InnoDB: Tablespace is missing for table classicmodels/offices.',
+    );
+
+    is( $db->_blocker_mysql_database_corrupted(), 0, 'Do not block if mysqlcheck gives only warnings' );
+    no_messages_seen();
+
+    $is_mysql_running   = 1;
+    $is_mysql_enabled   = 1;
+    @mysql_check_output = (
+        'Warning  : InnoDB: Tablespace is missing for table classicmodels/offices.',
+        'Error    : Tablespace is missing for table `classicmodels`.`offices`.',
+    );
+
+    like(
+        $db->_blocker_mysql_database_corrupted(),
+        {
+            id  => q[Elevate::Components::MySQL::_blocker_mysql_database_corrupted],
+            msg => qr/We have found the following problems with your database/
+        },
+        'Blocks if mysqlcheck reports errors'
+    );
+}
+
 done_testing();

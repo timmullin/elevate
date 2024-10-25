@@ -36,6 +36,7 @@ use Cpanel::JSON                       ();
 use Cpanel::SafeRun::Simple            ();
 use Cpanel::DB::Map::Collection::Index ();
 use Cpanel::Exception                  ();
+use Cpanel::MysqlUtils::Running        ();
 
 use Elevate::Database  ();
 use Elevate::Notify    ();
@@ -242,6 +243,7 @@ sub check ($self) {
     my $ok = 1;
     $ok = 0 unless $self->_blocker_old_mysql;
     $ok = 0 unless $self->_blocker_mysql_upgrade_in_progress;
+    $ok = 0 unless $self->_blocker_mysql_database_corrupted;
     $self->_warning_mysql_not_enabled();
     return $ok;
 }
@@ -355,6 +357,41 @@ sub _blocker_old_cpanel_mysql ($self) {
 sub _blocker_mysql_upgrade_in_progress ($self) {
     if ( -e q[/var/cpanel/mysql_upgrade_in_progress] ) {
         return $self->has_blocker(q[MySQL/MariaDB upgrade in progress. Please wait for the upgrade to finish.]);
+    }
+
+    return 0;
+}
+
+sub _blocker_mysql_database_corrupted ($self) {
+
+    # We cannot run mysqlcheck if mysql is not running
+    if ( !Cpanel::MysqlUtils::Running::is_mysql_running() ) {
+
+        if ( Cpanel::Services::Enabled::is_enabled('mysql') ) {
+            my $db_version = Elevate::Database::get_local_database_version();
+            my $db_type    = Elevate::Database::get_database_type_name_from_version($db_version);
+
+            WARN("$db_type is not running; this prevents us from verifying the integrity of the databases.");
+        }
+
+        return 0;
+    }
+
+    # Perform a medium check on all databases and only output errors
+    my $mysqlcheck_path = Cpanel::Binaries::path('mysqlcheck');
+    my $output          = $self->ssystem_capture_output( $mysqlcheck_path, '-c', '-m', '-A', '--silent' );
+
+    # mysqlcheck doesn't return an error code
+    # We check for lines that actually begin with "Error" (or "error")
+    # because we don't want to block of only warnings are found
+    if ( scalar grep { /^[eE]rror/ } @{ $output->{stdout} } ) {
+
+        my $issues_found = join( "\n", @{ $output->{stdout} } );
+        return $self->has_blocker( <<~"EOS" );
+            We have found the following problems with your database(s):
+            $issues_found
+            You should repair any corrupted databases before elevating the system.
+            EOS
     }
 
     return 0;
