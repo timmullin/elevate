@@ -10383,9 +10383,9 @@ sub start ($self) {
         WARN( <<~"EOS");
         Automated upgrade of the distro has been disabled.
         Please wait for the file '$touchfile' to be created.
-        At that stage, the ELevate process is paused, and you can upgrade from 7 to 8 on your own.
+        At that stage, the ELevate process is paused, and you can upgrade the distro on your own.
 
-        Once the system has been successfully upgraded from 7 to 8, you can then remove that file
+        Once the system has been successfully upgraded, you can then remove that file
         to let the ELevate process continue and update cPanel for the new distribution.
         EOS
         Elevate::StageFile::update_stage_file( { upgrade_distro_manually => 1 } );
@@ -10956,7 +10956,7 @@ sub run_stage_4 ($self) {
         }
 
         my $msg = <<~"END";
-        Server is currently running $current_distro $major after leapp upgrade.
+        Server is currently running $current_distro $major after distro upgrade.
         Upgrade to $pretty_distro_name did not succeed.
 
         END
