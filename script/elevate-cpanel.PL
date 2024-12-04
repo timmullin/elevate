@@ -1038,7 +1038,29 @@ sub run_stage_3 ($self) {
         $self->ssystem_and_die( '/usr/bin/mount', '-o', 'remount,exec', '/tmp' );
 
         INFO('Running do-release-upgrade');
-        $self->ssystem_and_die( '/usr/bin/do-release-upgrade', '-f', 'DistUpgradeViewNonInteractive' );
+        my $ret = $self->ssystem_capture_output( '/usr/bin/do-release-upgrade', '-f', 'DistUpgradeViewNonInteractive' );
+
+        if ( $ret->{status} != 0 ) {
+            my $stderr = join "\n", @{ $ret->{stderr} };
+
+            my $error_message = <<~"EOS";
+            Running do-release-upgrade has failed on your server with the
+            following error output:
+
+            $stderr
+
+            You may need to investigate the logs in /var/log/dist-upgrade
+            to find the cause.
+
+            Once you have resolved the issue(s), run the following command
+            to continue the update:
+
+            /scripts/elevate-cpanel --continue
+
+            EOS
+
+            die $error_message;
+        }
     }
 
     WARN(<<~'EOS');
